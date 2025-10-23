@@ -30,7 +30,7 @@ cython = "<3"
 d4rl = "^1.1"
 patchelf = "^0.17.2.4"
 robomimic = "0.3.0"
-robosuite = {git = "https://github.com/ARISE-Initiative/robosuite.git", rev = "v1.4.1"}
+robosuite = {git = "git@github.com:ARISE-Initiative/robosuite.git", rev = "v1.4.1"}
 pyopengl = "3.1.4"
 
 
@@ -45,6 +45,12 @@ gymnasium = {extras = ["atari"], version = "^1.2.1"}
 
 [tool.poetry.group.classic.dependencies]
 gymnasium = {extras = ["classic-control"], version = "^1.2.1"}
+
+
+[[tool.poetry.source]]
+name = "mirrors"
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
+priority = "primary"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
