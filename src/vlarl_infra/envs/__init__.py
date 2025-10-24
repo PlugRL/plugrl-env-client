@@ -14,3 +14,8 @@ try:
     from .atari.atari_env import AtariEnv
 except ImportError:
     pass
+
+try:
+    from .d4rl.d4rl_env import D4RLEnv
+except ImportError:
+    pass

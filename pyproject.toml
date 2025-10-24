@@ -47,6 +47,13 @@ gymnasium = {extras = ["atari"], version = "^1.2.1"}
 gymnasium = {extras = ["classic-control"], version = "^1.2.1"}
 
 
+
+[tool.poetry.group.d4rl.dependencies]
+cython = "<3"
+d4rl = "^1.1"
+patchelf = "^0.17.2.4"
+gymnasium-robotics = {extras = ["mujoco-py"], version = "^1.4.1"}
+
 [[tool.poetry.source]]
 name = "mirrors"
 url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
