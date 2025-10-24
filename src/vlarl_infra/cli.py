@@ -5,6 +5,7 @@ from typing import Literal
 import gymnasium as gym
 import tyro
 from loguru import logger
+import multiprocessing 
 
 import vlarl_infra
 from vlarl_infra.utils.registration import REGISTERED_ENV_CONFIGS
@@ -19,6 +20,8 @@ class Args:
     env: BaseEnvConfig
     num_episodes: int = 1
     log_level: Literal["debug", "info"] = "info"
+    
+    num_workers: int = 1 
 
     server_host: str =  "0.0.0.0"
     server_port: int = 8000
@@ -39,13 +42,25 @@ _CONFIGS_DICT = {k.lower(): Args(uid=k, env=v) for k, v in REGISTERED_ENV_CONFIG
 def cli() -> Args:
     return tyro.extras.overridable_config_cli({k: (k, v) for k, v in _CONFIGS_DICT.items()})
 
-def _main(args: Args):
-    logger.configure(handlers=[{"sink": sys.stdout, "level": args.log_level.upper()}])
 
-    logger.info(f"vlarl_infra version: {vlarl_infra.__version__}")
-    logger.info(f"Selected env: {args.uid}")
-    logger.info(f"Env config: {args.env}")
-
+def _run_worker(worker_id: int, args: Args):
+    logger.configure(
+        handlers=[
+            {
+                "sink": sys.stdout,
+                "level": args.log_level.upper(),
+                "format": (
+                    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+                    "<level>{level: <8}</level> | "
+                    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+                    "<yellow>{extra[prefix]}</yellow>{message}"  # 使用 {extra[prefix]}
+                ),
+            }
+        ],
+        extra={"prefix": f"[Worker {worker_id + 1}/{args.num_workers}] "}
+    )
+    logger.info(f"Starting worker process for env: {args.uid}")
+    
     try: 
         worker_agent = WebSocketWorkerAgent(host=args.server_host, port=args.server_port)
         logger.info(f"Connected to server with metadata: {worker_agent.get_server_metadata()}")
@@ -54,9 +69,11 @@ def _main(args: Args):
         return
 
     env = gym.make(args.uid, config=args.env, max_episode_steps=args.max_episode_steps)
+    
     if args.use_remote_viewer:
-        env = _wrappers.RemoteViewerWrapper(env, websocket_uri=f"ws://{args.viewer_host}:{args.viewer_port}/ws/env")
-        logger.info(f"Remote viewer enabled at {args.viewer_host}:{args.viewer_port}")
+        if worker_id == 0:
+            logger.info(f"Remote viewer enabled at {args.viewer_host}:{args.viewer_port}. Other workers share this port.")
+            env = _wrappers.RemoteViewerWrapper(env, websocket_uri=f"ws://{args.viewer_host}:{args.viewer_port}/ws/env")
 
     if args.use_real_time:
         env = _wrappers.RealTimeWrapper(env, fps=args.fps)
@@ -65,8 +82,6 @@ def _main(args: Args):
     for ep in range(args.num_episodes):
         obs, info = env.reset()
         action_plan = collections.deque()
-        logger.info(f"Episode {ep}:")
-        logger.info("  Info:", info)
         
         reward, terminated, truncated = 0.0, False, False
         step_count, total_reward, sum_reward = 0, 0., 0.
@@ -81,6 +96,7 @@ def _main(args: Args):
                     len(action_chunk) >= replan_steps
                 ), f"We want to replan every {args.replan_steps} steps, but policy only predicts {len(action_chunk)} steps."
                 action_plan.extend(action_chunk)
+            
             action = action_plan.popleft()
             obs, reward, terminated, truncated, info = env.step(action)
             step_count += 1
@@ -90,10 +106,36 @@ def _main(args: Args):
             if not action_plan or terminated or truncated:
                 worker_agent.feedback(dataclasses.asdict(obs), float(reward), terminated, truncated, info)
 
-            if step_count % 100 == 0 or terminated or truncated:
-                logger.debug(f"    Step {step_count}: reward={reward}, terminated={terminated}, truncated={truncated}, info={info}")
+        logger.info(f"Episode {ep} finished after {step_count} steps with total reward {total_reward} and info {info}")
 
-        logger.info(f"  Episode {ep} finished after {step_count} steps with total reward {total_reward} and info {info}")
+
+def _main(args: Args):
+    logger.configure(handlers=[{"sink": sys.stdout, "level": args.log_level.upper()}])
+
+    logger.info(f"vlarl_infra version: {vlarl_infra.__version__}")
+    logger.info(f"Selected env: {args.uid}")
+    logger.info(f"Env config: {args.env}")
     
+    if args.num_workers < 1:
+        logger.error("num_workers must be at least 1.")
+        return
+        
+    logger.info(f"Starting {args.num_workers} worker processes to run {args.num_episodes} episodes each.")
+
+    processes = []
+    for i in range(args.num_workers):
+        multiprocessing.set_start_method('spawn', force=True)
+        process = multiprocessing.Process(target=_run_worker, args=(i, args))
+        processes.append(process)
+        process.start()
+        
+    for process in processes:
+        process.join()
+
+    logger.info("All worker processes finished.")
+
 def main():
     _main(cli())
+    
+if __name__ == "__main__":
+    main()
