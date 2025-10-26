@@ -88,7 +88,7 @@ def _run_worker(worker_id: int, args: Args):
         
         while not (terminated or truncated):
             if not action_plan:
-                sum_reward += float(reward)
+                sum_reward = 0.0
                 action_data = worker_agent.infer(dataclasses.asdict(obs))
                 action_chunk = action_data["action"].swapaxes(1, 0)
                 replan_steps = args.replan_steps or len(action_chunk)
@@ -104,7 +104,7 @@ def _run_worker(worker_id: int, args: Args):
             sum_reward += float(reward)
 
             if not action_plan or terminated or truncated:
-                worker_agent.feedback(dataclasses.asdict(obs), float(reward), terminated, truncated, info)
+                worker_agent.feedback(dataclasses.asdict(obs), float(sum_reward), terminated, truncated, info)
 
         logger.info(f"Episode {ep} finished after {step_count} steps with total reward {total_reward} and info {info}")
 
