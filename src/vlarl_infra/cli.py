@@ -90,7 +90,7 @@ def _run_worker(worker_id: int, args: Args):
             if not action_plan:
                 sum_reward = 0.0
                 action_data = worker_agent.infer(dataclasses.asdict(obs))
-                action_chunk = action_data["action"].swapaxes(1, 0)
+                action_chunk = action_data["action"]
                 replan_steps = args.replan_steps or len(action_chunk)
                 assert (
                     len(action_chunk) >= replan_steps
