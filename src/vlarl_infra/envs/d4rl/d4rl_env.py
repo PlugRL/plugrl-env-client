@@ -4,7 +4,7 @@ import gym
 
 try:
     import d4rl.gym_mujoco
-except ImportError:
+except:
     raise ImportError('d4rl is not installed. Please install it with pip install "vlarl-infra[dr4rl]".')
 
 from vlarl_infra.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
