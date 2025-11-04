@@ -30,7 +30,7 @@ cython = "<3"
 d4rl = "^1.1"
 patchelf = "^0.17.2.4"
 robomimic = "0.3.0"
-robosuite = {git = "git@github.com:ARISE-Initiative/robosuite.git", rev = "v1.4.1"}
+robosuite = "<1.5.0"
 pyopengl = "3.1.4"
 
 
@@ -53,6 +53,11 @@ cython = "<3"
 d4rl = "^1.1"
 patchelf = "^0.17.2.4"
 gymnasium-robotics = {extras = ["mujoco-py"], version = "^1.4.1"}
+
+
+
+[tool.poetry.group.libero.dependencies]
+libero = {git = "git@github.com:CTP314/LIBERO.git"}
 
 [[tool.poetry.source]]
 name = "mirrors"
