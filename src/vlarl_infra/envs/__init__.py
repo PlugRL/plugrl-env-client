@@ -19,3 +19,8 @@ try:
     from .d4rl.d4rl_env import D4RLEnv
 except ImportError:
     pass
+
+try:
+    from .libero.libero_env import LiberoEnv
+except ImportError:
+    pass
