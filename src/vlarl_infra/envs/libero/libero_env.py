@@ -100,8 +100,8 @@ class LiberoEnv(BaseEnv):
         wrist_img = image_tools.convert_to_uint8(
             image_tools.resize_with_pad(wrist_img, self.resize_size, self.resize_size)
         )
-        
-        state = np.concatenate(
+
+        eef_state = np.concatenate(
             (
                 obs["robot0_eef_pos"],
                 _quat2axisangle(obs["robot0_eef_quat"]),
@@ -109,11 +109,11 @@ class LiberoEnv(BaseEnv):
             )
         )
         frames = {
-            "observation/image": img[None, ...],
-            "observation/wrist_image": wrist_img[None, ...],
+            "base": img[None, ...],
+            "wrist": wrist_img[None, ...],
         }
         states = {
-            "observation/state": state[None, ...],
+            "eef": eef_state[None, ...],
         }
         return Observation(
             images=frames,
