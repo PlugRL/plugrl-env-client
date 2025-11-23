@@ -125,7 +125,8 @@ class LiberoEnv(BaseEnv):
         if options is None:
             options = {}
         if "initial_state" not in options:
-            initial_state = self.initial_states[self.total_episodes % len(self.initial_states)]
+            intial_states_idx = np.random.randint(len(self.initial_states))
+            initial_state = self.initial_states[intial_states_idx]
             options["initial_state"] = initial_state
             self.total_episodes += 1
         self.env.reset()
