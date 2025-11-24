@@ -29,7 +29,7 @@ class Args:
     use_remote_viewer: bool = False
     
     viewer_host: str = "0.0.0.0"
-    viewer_port: int = 8001
+    viewer_port: int = 9000
     
     use_real_time: bool = False
     fps: float = 30.0
