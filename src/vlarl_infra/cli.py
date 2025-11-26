@@ -36,6 +36,8 @@ class Args:
     
     replan_steps: int | None = None
     max_episode_steps: int | None = None
+    
+    pass_worker_id: bool = False
 
 _CONFIGS_DICT = {k.lower(): Args(uid=k, env=v) for k, v in REGISTERED_ENV_CONFIGS.items()}
 
@@ -80,7 +82,7 @@ def _run_worker(worker_id: int, args: Args):
         logger.info(f"Real-time mode enabled at {args.fps} FPS")
 
     for ep in range(args.num_episodes):
-        obs, info = env.reset()
+        obs, info = env.reset(options=dict(worker_id=worker_id) if args.pass_worker_id else None)
         action_plan = collections.deque()
         
         reward, terminated, truncated = 0.0, False, False

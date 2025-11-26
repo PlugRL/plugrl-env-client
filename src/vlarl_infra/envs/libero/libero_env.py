@@ -14,6 +14,7 @@ from vlarl_infra.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observatio
 from vlarl_infra.utils.registration import register_env, register_env_config
 
 from vlarl_infra.envs.libero import image_tools
+from loguru import logger
 
 UID = "Libero-v1"
 
@@ -61,10 +62,20 @@ class LiberoEnv(BaseEnv):
     
     def __init__(self, config: LiberoConfig):
         super().__init__(config=config)
+        self.task_id = config.task_id
+        self.inited = False
+        self.config = config
+        
         benchmark_dict = benchmark.get_benchmark_dict()
         task_suite = benchmark_dict[config.task_suite_name]()
-        task = task_suite.get_task(config.task_id)
-        initial_states = task_suite.get_task_init_states(config.task_id)
+        self.task_suite = task_suite
+        self.num_tasks_in_suite = task_suite.get_num_tasks()
+        
+    def lazy_init(self):
+        config = self.config
+        task_suite = self.task_suite
+        task = task_suite.get_task(self.task_id)
+        initial_states = task_suite.get_task_init_states(self.task_id)
         
         env, task_description = _get_libero_env(task, LIBERO_ENV_RESOLUTION, config.seed)
         
@@ -90,6 +101,9 @@ class LiberoEnv(BaseEnv):
         self.resize_size = config.resize_size
         self.num_steps_wait = config.num_steps_wait
         self.current_step = 0
+        self.inited = True
+        
+        logger.info(f"LiberoEnv initialized with task_id={self.task_id}, max_steps={self.max_steps}, total_initial_states={len(self.initial_states)}")
         
     def prepare_obs(self, obs: dict) -> Observation:
         img = np.ascontiguousarray(obs["agentview_image"][::-1, ::-1])
@@ -124,6 +138,11 @@ class LiberoEnv(BaseEnv):
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> tuple[Observation | None, dict]:
         if options is None:
             options = {}
+        if not self.inited:
+            if "worker_id" in options:
+                self.task_id = options["worker_id"] % self.num_tasks_in_suite
+            self.lazy_init()
+
         if "initial_state" not in options:
             intial_states_idx = np.random.randint(len(self.initial_states))
             initial_state = self.initial_states[intial_states_idx]
