@@ -112,6 +112,7 @@ def _run_worker(worker_id: int, args: Args):
 
 
 def _main(args: Args):
+    multiprocessing.set_start_method("spawn", force=True)
     logger.configure(handlers=[{"sink": sys.stdout, "level": args.log_level.upper()}])
 
     logger.info(f"vlarl_infra version: {vlarl_infra.__version__}")
@@ -125,14 +126,21 @@ def _main(args: Args):
     logger.info(f"Starting {args.num_workers} worker processes to run {args.num_episodes} episodes each.")
 
     processes = []
-    for i in range(args.num_workers):
-        multiprocessing.set_start_method('spawn', force=True)
-        process = multiprocessing.Process(target=_run_worker, args=(i, args))
-        processes.append(process)
-        process.start()
-        
-    for process in processes:
-        process.join()
+    try:
+        for i in range(args.num_workers):
+            proc = multiprocessing.Process(target=_run_worker, args=(i, args), daemon=False)
+            proc.start()
+            processes.append(proc)
+
+        for proc in processes:
+            proc.join()
+    except KeyboardInterrupt:
+        logger.warning("Interrupted by user, terminating workers…")
+    finally:
+        for proc in processes:
+            if proc.is_alive():
+                proc.terminate()
+                proc.join()
 
     logger.info("All worker processes finished.")
 
