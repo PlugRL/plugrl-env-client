@@ -9,10 +9,12 @@ try:
     import robomimic.envs.env_robosuite
     import robomimic.utils.env_utils as _env_utils
     import robomimic.utils.obs_utils as _obs_utils
-except:
+except ImportError:
     raise ImportError(
         "Robomimic is not installed. Please install it with the 'robomimic' extra, e.g. 'pip install vlarl_infra[robomimic]'"
     )
+except Exception as e:
+    raise ImportError(f"An error occurred while importing robomimic: {e}")
 from vlarl_infra.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
 import dataclasses
 from vlarl_infra.utils.registration import register_env, register_env_config
