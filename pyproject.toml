@@ -14,7 +14,7 @@ dependencies = [
     "websockets (>=15.0.1,<16.0.0)",
     "msgpack (>=1.1.1,<2.0.0)",
     "tyro (>=0.9.31,<0.10.0)",
-    "vlarl-client @ git+ssh://git@github.com/CTP314/vlarl-client.git",
+    "vlarl-client @ git+https://github.com/CTP314/vlarl-client.git",
 ]
 
 [tool.poetry]
@@ -57,7 +57,7 @@ gymnasium-robotics = {extras = ["mujoco-py"], version = "^1.4.1"}
 
 
 [tool.poetry.group.libero.dependencies]
-libero = {git = "git@github.com:CTP314/LIBERO.git"}
+libero = {git = "https://github.com/CTP314/LIBERO.git"}
 
 [[tool.poetry.source]]
 name = "mirrors"
