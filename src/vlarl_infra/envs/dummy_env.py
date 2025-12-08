@@ -25,7 +25,7 @@ class DummyEnv(BaseEnv):
     text: str
     terminated_prob: float = 0.01
     
-    def __init__(self, config: DummyEnvConfig):
+    def __init__(self, config: DummyEnvConfig, worker_id: int | None = None, total_workers: int | None = None):
         super().__init__(config=config)
         self.img_width = config.img_width
         self.img_height = config.img_height

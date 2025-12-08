@@ -25,7 +25,7 @@ class BaseEnvConfig:
     max_episode_steps: int | None = None
 
 class BaseEnv(gym.Env, abc.ABC):    
-    def __init__(self, config: BaseEnvConfig):
+    def __init__(self, config: BaseEnvConfig, worker_id: int | None = None, total_workers: int | None = None):
         ...
 
     @abc.abstractmethod

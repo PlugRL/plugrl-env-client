@@ -41,7 +41,7 @@ class RobomimicEnv(BaseEnv):
     task: str
     agentview_image_size: tuple[int, int]
     
-    def __init__(self, config: RobomimicConfig):
+    def __init__(self, config: RobomimicConfig, worker_id: int | None = None, total_workers: int | None = None):
         super().__init__(config=config)
         
         try:

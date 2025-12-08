@@ -6,13 +6,15 @@ import gymnasium as gym
 import tyro
 from loguru import logger
 import multiprocessing 
+import gc
 
-import vlarl_infra
+import vlarl_infra.envs
 from vlarl_infra.utils.registration import REGISTERED_ENV_CONFIGS
 from vlarl_infra.envs.base_env import BaseEnvConfig
 from vlarl_client.websocket_worker_agent import WebSocketWorkerAgent
 import vlarl_infra.utils.wrappers as _wrappers
 
+_env_lock = multiprocessing.Lock()
 
 @dataclasses.dataclass
 class Args:
@@ -38,6 +40,7 @@ class Args:
     max_episode_steps: int | None = None
     
     pass_worker_id: bool = False
+    use_env_lock: bool = False
 
 _CONFIGS_DICT = {k.lower(): Args(uid=k, env=v) for k, v in REGISTERED_ENV_CONFIGS.items()}
 
@@ -52,16 +55,36 @@ def _run_worker(worker_id: int, args: Args):
                 "sink": sys.stdout,
                 "level": args.log_level.upper(),
                 "format": (
-                    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-                    "<level>{level: <8}</level> | "
-                    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
-                    "<yellow>{extra[prefix]}</yellow>{message}"  # 使用 {extra[prefix]}
+                    "<green>{time:HH:mm:ss}</green>|"
+                    "<level>{level}</level>|"
+                    "{file}:{line}|"
+                    "<yellow>{extra[prefix]}</yellow>"
+                    "<level>{message}</level>"
                 ),
             }
         ],
-        extra={"prefix": f"[Worker {worker_id + 1}/{args.num_workers}] "}
+        extra={"prefix": f"[W{worker_id}] "}
     )
     logger.info(f"Starting worker process for env: {args.uid}")
+    
+    try:
+        if args.use_env_lock:
+            with _env_lock:
+                env = gym.make(
+                    args.uid, config=args.env, max_episode_steps=args.max_episode_steps, 
+                    worker_id=worker_id if args.pass_worker_id else None, 
+                    total_workers=args.num_workers if args.pass_worker_id else None
+                )
+        else: 
+            env = gym.make(
+                args.uid, config=args.env, max_episode_steps=args.max_episode_steps, 
+                worker_id=worker_id if args.pass_worker_id else None, 
+                total_workers=args.num_workers if args.pass_worker_id else None
+            )
+    except Exception as e:
+        logger.error(f"Failed to create environment {args.uid}: {e}")
+        gc.collect()
+        return
     
     try: 
         worker_agent = WebSocketWorkerAgent(host=args.server_host, port=args.server_port)
@@ -69,8 +92,6 @@ def _run_worker(worker_id: int, args: Args):
     except Exception as e:
         logger.error(f"Failed to connect to server: {e}")
         return
-
-    env = gym.make(args.uid, config=args.env, max_episode_steps=args.max_episode_steps)
     
     if args.use_remote_viewer:
         if worker_id == 0:
@@ -82,7 +103,7 @@ def _run_worker(worker_id: int, args: Args):
         logger.info(f"Real-time mode enabled at {args.fps} FPS")
 
     for ep in range(args.num_episodes):
-        obs, info = env.reset(options=dict(worker_id=worker_id) if args.pass_worker_id else None)
+        obs, info = env.reset()
         action_plan = collections.deque()
         
         reward, terminated, truncated = 0.0, False, False
@@ -108,11 +129,10 @@ def _run_worker(worker_id: int, args: Args):
             if not action_plan or terminated or truncated:
                 worker_agent.feedback(dataclasses.asdict(obs), float(sum_reward), terminated, truncated, info)
 
-        logger.info(f"Episode {ep} finished after {step_count} steps with total reward {total_reward} and info {info}")
-
+        logger.debug(f"Episode {ep} finished after {step_count} steps with total reward {total_reward} and info {info}")
+    env.close()
 
 def _main(args: Args):
-    multiprocessing.set_start_method("spawn", force=True)
     logger.configure(handlers=[{"sink": sys.stdout, "level": args.log_level.upper()}])
 
     logger.info(f"vlarl_infra version: {vlarl_infra.__version__}")
@@ -124,9 +144,10 @@ def _main(args: Args):
         return
         
     logger.info(f"Starting {args.num_workers} worker processes to run {args.num_episodes} episodes each.")
-
     processes = []
-    try:
+    if args.num_workers == 1:
+        _run_worker(0, args)
+    else:
         for i in range(args.num_workers):
             proc = multiprocessing.Process(target=_run_worker, args=(i, args), daemon=False)
             proc.start()
@@ -134,13 +155,6 @@ def _main(args: Args):
 
         for proc in processes:
             proc.join()
-    except KeyboardInterrupt:
-        logger.warning("Interrupted by user, terminating workers…")
-    finally:
-        for proc in processes:
-            if proc.is_alive():
-                proc.terminate()
-                proc.join()
 
     logger.info("All worker processes finished.")
 

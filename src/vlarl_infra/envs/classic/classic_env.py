@@ -21,7 +21,7 @@ class ClassicConfig(BaseEnvConfig):
 class ClassicEnv(BaseEnv):
     env: gym.Env
     
-    def __init__(self, config: ClassicConfig):
+    def __init__(self, config: ClassicConfig, worker_id: int | None = None, total_workers: int | None = None):
         super().__init__(config=config)
         env = gym.make(config.classic_env_name, render_mode="rgb_array")
         self.env = env

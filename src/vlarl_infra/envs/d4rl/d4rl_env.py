@@ -23,7 +23,7 @@ class D4RLConfig(BaseEnvConfig):
 class D4RLEnv(BaseEnv):
     env: gym.Env
     
-    def __init__(self, config: D4RLConfig):
+    def __init__(self, config: D4RLConfig, worker_id: int | None = None, total_workers: int | None = None):
         super().__init__(config=config)
         env = gym.make(config.env_name)
         self.env = env

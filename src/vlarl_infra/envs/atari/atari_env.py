@@ -24,7 +24,7 @@ class AtariConfig(BaseEnvConfig):
 class AtariEnv(BaseEnv):
     env: gym.Env
     
-    def __init__(self, config: AtariConfig):
+    def __init__(self, config: AtariConfig, worker_id: int | None = None, total_workers: int | None = None):
         super().__init__(config=config)
         env = gym.make(config.name, render_mode="rgb_array")
         env = NoopResetEnv(env, noop_max=30)
