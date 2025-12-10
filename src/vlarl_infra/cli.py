@@ -27,7 +27,7 @@ class RecordArgs:
     traj: bool = True
     traj_interval: int = 10
     video: bool = True
-    video_interval: int = 10
+    video_interval: int = 100
 
 @dataclasses.dataclass
 class Args:
