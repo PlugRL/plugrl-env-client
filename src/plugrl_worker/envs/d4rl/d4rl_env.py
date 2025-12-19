@@ -5,12 +5,12 @@ import gym
 try:
     import d4rl.gym_mujoco
 except ImportError:
-    raise ImportError('d4rl is not installed. Please install it with pip install "vlarl-infra[dr4rl]".')
+    raise ImportError('d4rl is not installed. Please install it with pip install "plugrl-worker[dr4rl]".')
 except Exception as e:
     raise ImportError(f"An error occurred while importing d4rl: {e}")
 
-from vlarl_infra.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
-from vlarl_infra.utils.registration import register_env, register_env_config
+from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
+from plugrl_worker.utils.registration import register_env, register_env_config
 
 UID = "D4RL-v1"
 

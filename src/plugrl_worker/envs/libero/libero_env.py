@@ -8,14 +8,14 @@ try:
     from libero import get_libero_path
     from libero.envs import OffScreenRenderEnv
 except ImportError:
-    raise ImportError('libero is not installed. Please install it with pip install "vlarl-infra[libero]".')
+    raise ImportError('libero is not installed. Please install it with pip install "plugrl-worker[libero]".')
 except Exception as e:
     raise ImportError(f"An error occurred while importing libero: {e}")
 
-from vlarl_infra.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
-from vlarl_infra.utils.registration import register_env, register_env_config
+from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
+from plugrl_worker.utils.registration import register_env, register_env_config
 
-from vlarl_infra.envs.libero import image_tools
+from plugrl_worker.envs.libero import image_tools
 from loguru import logger
 
 UID = "Libero-v1"

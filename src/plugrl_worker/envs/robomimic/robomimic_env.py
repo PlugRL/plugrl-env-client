@@ -11,13 +11,13 @@ try:
     import robomimic.utils.obs_utils as _obs_utils
 except ImportError:
     raise ImportError(
-        "Robomimic is not installed. Please install it with the 'robomimic' extra, e.g. 'pip install vlarl_infra[robomimic]'"
+        "Robomimic is not installed. Please install it with the 'robomimic' extra, e.g. 'pip install plugrl_worker[robomimic]'"
     )
 except Exception as e:
     raise ImportError(f"An error occurred while importing robomimic: {e}")
-from vlarl_infra.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
+from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
 import dataclasses
-from vlarl_infra.utils.registration import register_env, register_env_config
+from plugrl_worker.utils.registration import register_env, register_env_config
 
 UID = "Robomimic-v1"
 ENV_META_DIR = pathlib.Path(__file__).parent / "env_meta"

@@ -1,5 +1,5 @@
 [project]
-name = "vlarl-infra"
+name = "plugrl-worker"
 version = "0.1.0"
 description = ""
 authors = [
@@ -14,15 +14,15 @@ dependencies = [
     "websockets (>=15.0.1,<16.0.0)",
     "msgpack (>=1.1.1,<2.0.0)",
     "tyro (>=0.9.31,<0.10.0)",
-    "vlarl-client @ git+https://github.com/CTP314/vlarl-client.git",
+    "plugrl-client @ git+https://github.com/PlugRL/plugrl-client.git",
     "pandas (>=2.3.3,<3.0.0)",
 ]
 
 [tool.poetry]
-packages = [{include = "vlarl_infra", from = "src"}]
+packages = [{include = "plugrl_worker", from = "src"}]
 
 [tool.poetry.scripts]
-vlarl-run-worker = "vlarl_infra.cli:main"
+plugrl-run-worker = "plugrl_worker.cli:main"
 
 [tool.poetry.dependencies]
 
@@ -60,10 +60,10 @@ gymnasium-robotics = {extras = ["mujoco-py"], version = "^1.4.1"}
 [tool.poetry.group.libero.dependencies]
 libero = {git = "https://github.com/CTP314/LIBERO.git"}
 
-[[tool.poetry.source]]
-name = "mirrors"
-url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
-priority = "primary"
+# [[tool.poetry.source]]
+# name = "mirrors"
+# url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
+# priority = "primary"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

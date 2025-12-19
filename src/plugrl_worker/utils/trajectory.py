@@ -1,7 +1,7 @@
 import imageio
 import pandas as pd
 import pathlib
-from vlarl_infra.envs.base_env import Observation
+from plugrl_worker.envs.base_env import Observation
 
 class Recorder:
     def __init__(self, save_dir: pathlib.Path, record_trajectory: bool = True, record_video: bool = True,

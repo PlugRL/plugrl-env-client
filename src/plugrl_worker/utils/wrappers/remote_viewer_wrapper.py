@@ -6,14 +6,14 @@ import dataclasses
 import numpy as np
 from gymnasium.core import Env, Wrapper
 from typing import Any, Dict
-from vlarl_client import msgpack_numpy
+from plugrl_client import msgpack_numpy
 from loguru import logger
 import queue
 from PIL import Image
 import io
 import base64
 
-from vlarl_infra.envs.base_env import Observation
+from plugrl_worker.envs.base_env import Observation
 
 
 class RemoteViewerCommunicator:

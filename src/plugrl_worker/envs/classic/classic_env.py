@@ -5,10 +5,10 @@ import gymnasium as gym
 try:
     import pygame
 except ImportError:
-    raise ImportError('pygame is not installed. Please install it with pip install "vlarl-infra[classic]".')
+    raise ImportError('pygame is not installed. Please install it with pip install "plugrl-worker[classic]".')
 
-from vlarl_infra.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
-from vlarl_infra.utils.registration import register_env, register_env_config
+from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
+from plugrl_worker.utils.registration import register_env, register_env_config
 
 UID = "Classic-v1"
 

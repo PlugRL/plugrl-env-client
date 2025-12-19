@@ -1,11 +1,11 @@
-# 🚀 VLARL-Infra
+# 🚀 plugrl-worker
 
-**VLARL-Infra** (Vision Language Action Reinforcement Learning Infrastructure) is a foundational framework for building and running distributed reinforcement learning agents. It's designed to streamline the communication between environment workers and a centralized training server, enabling efficient and scalable RL experiments.
+**plugrl-worker** (Vision Language Action Reinforcement Learning Infrastructure) is a foundational framework for building and running distributed reinforcement learning agents. It's designed to streamline the communication between environment workers and a centralized training server, enabling efficient and scalable RL experiments.
 
 ## ✨ Features
 
   * **Distributed Communication**: Utilizes `websockets` and `msgpack` for fast, secure, and asynchronous data transfer between the central server and multiple environment workers.
-  * **Modular Design**: Separates the core infrastructure (`vlarl-infra`) from the client-side components (`vlarl-client`), allowing for independent development and deployment.
+  * **Modular Design**: Separates the core infrastructure (`plugrl-worker`) from the client-side components (`plugrl-client`), allowing for independent development and deployment.
   * **Command-Line Interface**: Provides a user-friendly CLI powered by `tyro` for starting and managing RL tasks.
   * **Gymnasium Integration**: Seamlessly works with `Gymnasium` environments for standardized and flexible environment interaction.
 
@@ -18,8 +18,8 @@ The easiest way to get started is by cloning the repository and using Poetry to 
 1.  **Clone the repository:**
 
     ```bash
-    git clone git@github.com:CTP314/vlarl-infra.git
-    cd vlarl-infra
+    git clone git@github.com:CTP314/plugrl-worker.git
+    cd plugrl-worker
     ```
 
 2.  **Install dependencies with Pip:**
@@ -36,12 +36,12 @@ The easiest way to get started is by cloning the repository and using Poetry to 
 
 ## 🚀 Usage
 
-The `vlarl-run-worker` tool launches worker processes for specific environments.
+The `plugrl-run-worker` tool launches worker processes for specific environments.
 
 ### Basic Syntax
 
 ```bash
-poetry run vlarl-run-worker <ENVIRONMENT_TYPE> [OPTIONS]
+poetry run plugrl-run-worker <ENVIRONMENT_TYPE> [OPTIONS]
 ```
 
 ### Remote Viewer Usage (`--use-remote-viewer`)
@@ -56,21 +56,21 @@ The `--use-remote-viewer` flag enables the worker to send environment observatio
 
 #### How to Use the Remote Viewer
 
-To utilize this feature, you must first start the **viewer frontend** in a separate terminal, typically from the **`vlarl-viewer`** project.
+To utilize this feature, you must first start the **viewer frontend** in a separate terminal, typically from the **`plugrl-viewer`** project.
 
 1.  **Start the Viewer Frontend:**
-    In your `vlarl-viewer` project directory, run the following command to start the web application (listening on the default port `8001`):
+    In your `plugrl-viewer` project directory, run the following command to start the web application (listening on the default port `8001`):
 
     ```bash
-    uvicorn vlarl_viewer.main:app --reload --port 8001
+    uvicorn plugrl_viewer.main:app --reload --port 8001
     ```
 
 2.  **Run the Worker with the Flag:**
-    In your `vlarl-launcher` project, execute the worker command, making sure to include the `--use-remote-viewer` flag:
+    In your `plugrl-server` project, execute the worker command, making sure to include the `--use-remote-viewer` flag:
 
     ```bash
     # Example: Run the dummy worker and stream data to the viewer on port 8001
-    vlarl-run-worker dummy-v1 --use-remote-viewer
+    plugrl-run-worker dummy-v1 --use-remote-viewer
     ```
 
 The worker will then attempt to establish a WebSocket connection with the viewer at the specified host and port (defaulting to `0.0.0.0:8001`) and begin streaming environment data.
@@ -90,10 +90,10 @@ Run the `dummy-v1` environment with custom parameters:
 
 ```bash
 # Run 100 episodes with 'debug' logging level
-poetry run vlarl-run-worker dummy-v1 --num-episodes 100 --log-level debug
+poetry run plugrl-run-worker dummy-v1 --num-episodes 100 --log-level debug
 
 # Run with custom environment settings (64x64 image, 4-dim action space)
-poetry run vlarl-run-worker dummy-v1 --env.img-width 64 --env.img-height 64 --env.action-dim 4
+poetry run plugrl-run-worker dummy-v1 --env.img-width 64 --env.img-height 64 --env.action-dim 4
 ```
 
 ### Get More Help
@@ -101,5 +101,5 @@ poetry run vlarl-run-worker dummy-v1 --env.img-width 64 --env.img-height 64 --en
 To see all available options for a specific environment:
 
 ```bash
-poetry run vlarl-run-worker dummy-v1 --help
+poetry run plugrl-run-worker dummy-v1 --help
 ```

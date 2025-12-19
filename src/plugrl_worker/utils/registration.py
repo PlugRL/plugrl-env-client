@@ -9,8 +9,8 @@ import gymnasium as gym
 from loguru import logger
 from gymnasium.envs.registration import EnvSpec as GymEnvSpec
 
-from vlarl_infra.envs.base_env import BaseEnv, BaseEnvConfig
-from vlarl_infra.utils.wrappers.success_record_wrapper import RecordSuccessByStep
+from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig
+from plugrl_worker.utils.wrappers.success_record_wrapper import RecordSuccessByStep
 
 class EnvSpec:
     def __init__(self, uid: str, cls: Type[BaseEnv], max_episode_steps: int | None = None, default_kwargs: dict | None = None):

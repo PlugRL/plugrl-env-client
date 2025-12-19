@@ -12,13 +12,13 @@ import dateutil
 import uuid
 import pathlib
 
-import vlarl_infra.envs
+import plugrl_worker.envs
 import functools
-from vlarl_infra.utils.registration import REGISTERED_ENV_CONFIGS
-from vlarl_infra.envs.base_env import BaseEnvConfig
-from vlarl_infra.utils.trajectory import Recorder
-from vlarl_client.websocket_worker_agent import WebSocketWorkerAgent
-import vlarl_infra.utils.wrappers as _wrappers
+from plugrl_worker.utils.registration import REGISTERED_ENV_CONFIGS
+from plugrl_worker.envs.base_env import BaseEnvConfig
+from plugrl_worker.utils.trajectory import Recorder
+from plugrl_client.websocket_worker_agent import WebSocketWorkerAgent
+import plugrl_worker.utils.wrappers as _wrappers
 
 _env_lock = multiprocessing.Lock()
 
@@ -194,7 +194,7 @@ def _main(args: Args):
     multiprocessing.set_start_method("spawn", force=True)
     logger.configure(handlers=[{"sink": sys.stdout, "level": args.log_level.upper()}])
 
-    logger.info(f"vlarl_infra version: {vlarl_infra.__version__}")
+    logger.info(f"plugrl_worker version: {plugrl_worker.__version__}")
     logger.info(f"Selected env: {args.uid}")
     logger.info(f"Env config: {args.env}")
     
