@@ -37,6 +37,7 @@ pyopengl = "3.1.4"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
+pre-commit = "^4.5.1"
 
 
 [tool.poetry.group.atari.dependencies]

@@ -5,7 +5,7 @@ from typing import Literal
 import gymnasium as gym
 import tyro
 from loguru import logger
-import multiprocessing 
+import multiprocessing
 import gc
 import datetime
 import dateutil
@@ -22,12 +22,14 @@ import plugrl_worker.utils.wrappers as _wrappers
 
 _env_lock = multiprocessing.Lock()
 
+
 @dataclasses.dataclass
 class RecordArgs:
     traj: bool = True
     traj_interval: int = 10
     video: bool = True
     video_interval: int = 100
+
 
 @dataclasses.dataclass
 class Args:
@@ -36,31 +38,31 @@ class Args:
     env: BaseEnvConfig
     num_episodes: int = 1
     log_level: Literal["debug", "info"] = "info"
-    
-    num_workers: int = 1 
 
-    server_host: str =  "0.0.0.0"
+    num_workers: int = 1
+
+    server_host: str = "0.0.0.0"
     server_port: int = 8000
-    
+
     use_remote_viewer: bool = False
-    
+
     viewer_host: str = "0.0.0.0"
     viewer_port: int = 9000
-    
+
     prefix: str | None = None
     suffix: str | None = None
     exp_name: str | None = None
     log_base_dir: pathlib.Path = pathlib.Path("./logs")
-    
+
     use_real_time: bool = False
     fps: float = 30.0
-    
+
     replan_steps: int | None = None
     max_episode_steps: int | None = None
-    
+
     pass_worker_id: bool = False
     use_env_lock: bool = False
-    
+
     def __post_init__(self):
         if self.exp_name is None:
             if self.prefix is None:
@@ -69,12 +71,13 @@ class Args:
             self.exp_name = create_exp_name(self.prefix)
             if self.suffix is not None:
                 self.exp_name = f"{self.exp_name}_{self.suffix}"
-                
+
     @property
     def log_dir(self):
         assert self.exp_name is not None
         return self.log_base_dir / self.exp_name
-        
+
+
 def create_exp_name(exp_prefix, exp_id=0, seed=0):
     """
     Create a semi-unique experiment name that has a timestamp
@@ -83,13 +86,20 @@ def create_exp_name(exp_prefix, exp_id=0, seed=0):
     :return:
     """
     now = datetime.datetime.now(dateutil.tz.tzlocal())
-    timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
+    timestamp = now.strftime("%Y_%m_%d_%H_%M_%S")
     return "%s_%s_%04d--s-%d" % (timestamp, exp_prefix, exp_id, seed)
 
-_CONFIGS_DICT = {k.lower(): functools.partial(Args, uid=k, env=v) for k, v in REGISTERED_ENV_CONFIGS.items()}
+
+_CONFIGS_DICT = {
+    k.lower(): functools.partial(Args, uid=k, env=v)
+    for k, v in REGISTERED_ENV_CONFIGS.items()
+}
+
 
 def cli() -> Args:
-    return tyro.extras.subcommand_cli_from_dict({k: v for k, v in _CONFIGS_DICT.items()})
+    return tyro.extras.subcommand_cli_from_dict(
+        {k: v for k, v in _CONFIGS_DICT.items()}
+    )
 
 
 def _run_worker(worker_id: int, args: Args):
@@ -107,45 +117,57 @@ def _run_worker(worker_id: int, args: Args):
                 ),
             }
         ],
-        extra={"prefix": f"[W{worker_id}] "}
+        extra={"prefix": f"[W{worker_id}] "},
     )
     logger.info(f"Starting worker process for env: {args.uid}")
-    
+
     try:
         if args.use_env_lock:
             with _env_lock:
                 env = gym.make(
-                    args.uid, config=args.env, max_episode_steps=args.max_episode_steps, 
-                    worker_id=worker_id if args.pass_worker_id else None, 
-                    total_workers=args.num_workers if args.pass_worker_id else None
+                    args.uid,
+                    config=args.env,
+                    max_episode_steps=args.max_episode_steps,
+                    worker_id=worker_id if args.pass_worker_id else None,
+                    total_workers=args.num_workers if args.pass_worker_id else None,
                 )
-        else: 
+        else:
             env = gym.make(
-                args.uid, config=args.env, max_episode_steps=args.max_episode_steps, 
-                worker_id=worker_id if args.pass_worker_id else None, 
-                total_workers=args.num_workers if args.pass_worker_id else None
+                args.uid,
+                config=args.env,
+                max_episode_steps=args.max_episode_steps,
+                worker_id=worker_id if args.pass_worker_id else None,
+                total_workers=args.num_workers if args.pass_worker_id else None,
             )
     except Exception as e:
         logger.error(f"Failed to create environment {args.uid}: {e}")
         gc.collect()
         return
-    
-    try: 
-        worker_agent = WebSocketWorkerAgent(host=args.server_host, port=args.server_port)
-        logger.info(f"Connected to server with metadata: {worker_agent.get_server_metadata()}")
+
+    try:
+        worker_agent = WebSocketWorkerAgent(
+            host=args.server_host, port=args.server_port
+        )
+        logger.info(
+            f"Connected to server with metadata: {worker_agent.get_server_metadata()}"
+        )
     except Exception as e:
         logger.error(f"Failed to connect to server: {e}")
         return
-    
+
     if args.use_remote_viewer:
         if worker_id == 0:
-            logger.info(f"Remote viewer enabled at {args.viewer_host}:{args.viewer_port}. Other workers share this port.")
-            env = _wrappers.RemoteViewerWrapper(env, websocket_uri=f"ws://{args.viewer_host}:{args.viewer_port}/ws/env")
+            logger.info(
+                f"Remote viewer enabled at {args.viewer_host}:{args.viewer_port}. Other workers share this port."
+            )
+            env = _wrappers.RemoteViewerWrapper(
+                env, websocket_uri=f"ws://{args.viewer_host}:{args.viewer_port}/ws/env"
+            )
 
     if args.use_real_time:
         env = _wrappers.RealTimeWrapper(env, fps=args.fps)
         logger.info(f"Real-time mode enabled at {args.fps} FPS")
-        
+
     recorder = Recorder(
         save_dir=args.log_dir / f"worker_{worker_id}",
         record_trajectory=args.record.traj,
@@ -158,37 +180,48 @@ def _run_worker(worker_id: int, args: Args):
         obs, info = env.reset()
         recorder.record_frame(ep, obs)
         action_plan = collections.deque()
-        
+
         reward, terminated, truncated = 0.0, False, False
-        step_count, total_reward, sum_reward = 0, 0., 0.
-        
+        step_count, total_reward, sum_reward = 0, 0.0, 0.0
+
         while not (terminated or truncated):
             if not action_plan:
                 sum_reward = 0.0
                 action_data = worker_agent.infer(dataclasses.asdict(obs))
                 action_chunk = action_data["action"]
                 replan_steps = args.replan_steps or len(action_chunk)
-                assert (
-                    len(action_chunk) >= replan_steps
-                ), f"We want to replan every {args.replan_steps} steps, but policy only predicts {len(action_chunk)} steps."
+                assert len(action_chunk) >= replan_steps, (
+                    f"We want to replan every {args.replan_steps} steps, but policy only predicts {len(action_chunk)} steps."
+                )
                 action_plan.extend(action_chunk)
-            
+
             action = action_plan.popleft()
             obs, reward, terminated, truncated, info = env.step(action)
             recorder.record_frame(ep, obs)
             step_count += 1
-            total_reward += float(reward)        
+            total_reward += float(reward)
             sum_reward += float(reward)
 
             if not action_plan or terminated or truncated:
-                worker_agent.feedback(dataclasses.asdict(obs), float(sum_reward), terminated, truncated, info)
+                worker_agent.feedback(
+                    dataclasses.asdict(obs),
+                    float(sum_reward),
+                    terminated,
+                    truncated,
+                    info,
+                )
 
         success = False
         if "episode" in info and isinstance(info["episode"], dict):
             success = info["episode"].get("s", False)
-        recorder.finish_episode(ep, total_reward, success, step_count, force=ep == args.num_episodes - 1)
-        logger.debug(f"Episode {ep} finished after {step_count} steps with total reward {total_reward} and info {info}")
+        recorder.finish_episode(
+            ep, total_reward, success, step_count, force=ep == args.num_episodes - 1
+        )
+        logger.debug(
+            f"Episode {ep} finished after {step_count} steps with total reward {total_reward} and info {info}"
+        )
     env.close()
+
 
 def _main(args: Args):
     multiprocessing.set_start_method("spawn", force=True)
@@ -197,18 +230,22 @@ def _main(args: Args):
     logger.info(f"plugrl_worker version: {plugrl_worker.__version__}")
     logger.info(f"Selected env: {args.uid}")
     logger.info(f"Env config: {args.env}")
-    
+
     if args.num_workers < 1:
         logger.error("num_workers must be at least 1.")
         return
-        
-    logger.info(f"Starting {args.num_workers} worker processes to run {args.num_episodes} episodes each.")
+
+    logger.info(
+        f"Starting {args.num_workers} worker processes to run {args.num_episodes} episodes each."
+    )
     processes = []
     if args.num_workers == 1:
         _run_worker(0, args)
     else:
         for i in range(args.num_workers):
-            proc = multiprocessing.Process(target=_run_worker, args=(i, args), daemon=False)
+            proc = multiprocessing.Process(
+                target=_run_worker, args=(i, args), daemon=False
+            )
             proc.start()
             processes.append(proc)
 
@@ -217,8 +254,10 @@ def _main(args: Args):
 
     logger.info("All worker processes finished.")
 
+
 def main():
     _main(cli())
-    
+
+
 if __name__ == "__main__":
     main()

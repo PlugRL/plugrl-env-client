@@ -29,7 +29,7 @@ The easiest way to get started is by cloning the repository and using Poetry to 
     ```
 
 3. **Install Optional Environment Dependencies**
-   
+
     ```
     pip install -e ".[robomimic, atari, classic]"
     ```

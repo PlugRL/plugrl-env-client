@@ -1,6 +1,7 @@
 import time
 from gymnasium.core import Env, Wrapper
 
+
 class RealTimeWrapper(Wrapper):
     def __init__(self, env: Env, fps: float = 30.0):
         super().__init__(env)

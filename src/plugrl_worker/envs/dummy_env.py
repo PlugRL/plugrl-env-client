@@ -6,6 +6,7 @@ from plugrl_worker.utils.registration import register_env, register_env_config
 
 UID = "Dummy-v1"
 
+
 @register_env_config(UID)
 @dataclasses.dataclass
 class DummyEnvConfig(BaseEnvConfig):
@@ -16,6 +17,7 @@ class DummyEnvConfig(BaseEnvConfig):
     text: str = "do something"
     terminated_prob: float = 0.01
 
+
 @register_env(UID, max_episode_steps=200000)
 class DummyEnv(BaseEnv):
     img_height: int
@@ -24,8 +26,13 @@ class DummyEnv(BaseEnv):
     state_dim: int
     text: str
     terminated_prob: float = 0.01
-    
-    def __init__(self, config: DummyEnvConfig, worker_id: int | None = None, total_workers: int | None = None):
+
+    def __init__(
+        self,
+        config: DummyEnvConfig,
+        worker_id: int | None = None,
+        total_workers: int | None = None,
+    ):
         super().__init__(config=config)
         self.img_width = config.img_width
         self.img_height = config.img_height
@@ -44,16 +51,20 @@ class DummyEnv(BaseEnv):
 
     def fake_action(self) -> Action:
         return np.random.rand(1, self.action_dim).astype(np.float32)
-    
+
     def fake_obs(self) -> Observation:
         obs = Observation(
             images={
-                "base": np.random.randint(0, 255, (1, self.img_height, self.img_width, 3)).astype(np.uint8),
-                "wrist": np.random.randint(0, 255, (1, self.img_height // 2, self.img_width // 2, 3)).astype(np.uint8),
+                "base": np.random.randint(
+                    0, 255, (1, self.img_height, self.img_width, 3)
+                ).astype(np.uint8),
+                "wrist": np.random.randint(
+                    0, 255, (1, self.img_height // 2, self.img_width // 2, 3)
+                ).astype(np.uint8),
             },
             states={
                 "robot_state": np.random.rand(1, self.state_dim),
-                "joint_angles": np.random.rand(1, self.state_dim // 2)
+                "joint_angles": np.random.rand(1, self.state_dim // 2),
             },
             text=self.text,
         )
