@@ -16,6 +16,7 @@ dependencies = [
     "tyro (>=0.9.31,<0.10.0)",
     "plugrl-client @ git+https://github.com/PlugRL/plugrl-client.git",
     "pandas (>=2.3.3,<3.0.0)",
+    "imageio[ffmpeg] (>=2.37.2,<3.0.0)",
 ]
 
 [tool.poetry]
@@ -38,6 +39,7 @@ pyopengl = "3.1.4"
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
 pre-commit = "^4.5.1"
+pytest = "^9.0.2"
 
 
 [tool.poetry.group.atari.dependencies]
@@ -60,6 +62,9 @@ gymnasium-robotics = {extras = ["mujoco-py"], version = "^1.4.1"}
 
 [tool.poetry.group.libero.dependencies]
 libero = {git = "https://github.com/CTP314/LIBERO.git"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 # [[tool.poetry.source]]
 # name = "mirrors"
