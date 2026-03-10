@@ -43,6 +43,7 @@ class Args:
 
     server_host: str = "0.0.0.0"
     server_port: int = 8000
+    reconnect_on_server_stop: bool = False
 
     use_remote_viewer: bool = False
 
@@ -146,11 +147,16 @@ def _run_worker(worker_id: int, args: Args):
 
     try:
         worker_agent = WebSocketWorkerAgent(
-            host=args.server_host, port=args.server_port
+            host=args.server_host,
+            port=args.server_port,
+            reconnect_on_server_stop=args.reconnect_on_server_stop,
         )
         logger.info(
             f"Connected to server with metadata: {worker_agent.get_server_metadata()}"
         )
+    except ServerStopped as e:
+        logger.info(f"Server stopped normally before worker started running: {e}")
+        return
     except Exception as e:
         logger.error(f"Failed to connect to server: {e}")
         return

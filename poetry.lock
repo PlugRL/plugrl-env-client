@@ -4084,7 +4084,7 @@ numpy = "<2.3.3"
 type = "git"
 url = "https://github.com/PlugRL/plugrl-client.git"
 reference = "HEAD"
-resolved_reference = "4e0ea6a7311935b6a266f4d040b8552986f754c5"
+resolved_reference = "c11cef129cebe0b21d01a7617bed6bbc0fdd193a"
 
 [[package]]
 name = "pre-commit"
