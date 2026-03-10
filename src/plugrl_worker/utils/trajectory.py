@@ -67,3 +67,11 @@ class Recorder:
             self.writers = None
         if episode % self.trajectory_save_interval == 0 or force:
             self.trajectory_df.to_csv(self.save_dir / "trajectory.csv", index=False)
+
+    def close(self) -> None:
+        if self.record_video and self.writers is not None:
+            for writer in self.writers.values():
+                writer.close()
+            self.writers = None
+        if self.record_trajectory:
+            self.trajectory_df.to_csv(self.save_dir / "trajectory.csv", index=False)
