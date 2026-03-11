@@ -21,6 +21,7 @@ UID = "D4RL-v1"
 @dataclasses.dataclass
 class D4RLConfig(BaseEnvConfig):
     env_name: str = "hopper-medium-v2"
+    use_image: bool = False
 
 
 @register_env(UID)
@@ -37,10 +38,14 @@ class D4RLEnv(BaseEnv):
         env = gym.make(config.env_name)
         self.env = env
         self.task_name = config.env_name
+        self.use_image = config.use_image
 
     def prepare_obs(self, obs: np.ndarray) -> Observation:
-        frame = self.env.render(mode="rgb_array")
-        frames = {"env": np.array(frame)[None, ...]}
+        if self.use_image:
+            frame = self.env.render(mode="rgb_array")
+            frames = {"env": np.array(frame)[None, ...]}
+        else:
+            frames = {}
         states = {"obs": obs[None, ...]}
         return Observation(
             images=frames,
