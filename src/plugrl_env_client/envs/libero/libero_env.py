@@ -9,15 +9,15 @@ try:
     from libero.envs import OffScreenRenderEnv
 except ImportError:
     raise ImportError(
-        'libero is not installed. Please install it with pip install "plugrl-worker[libero]".'
+        'libero is not installed. Please install it with pip install "plugrl-env-client[libero]".'
     )
 except Exception as e:
     raise ImportError(f"An error occurred while importing libero: {e}")
 
-from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
-from plugrl_worker.utils.registration import register_env, register_env_config
+from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
+from plugrl_env_client.utils.registration import register_env, register_env_config
 
-from plugrl_worker.envs.libero import image_tools
+from . import image_tools
 
 UID = "Libero-v1"
 

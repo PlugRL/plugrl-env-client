@@ -1,8 +1,8 @@
 import numpy as np
 import gymnasium as gym
 
-from plugrl_worker.utils.wrappers.real_time_wrapper import RealTimeWrapper
-from plugrl_worker.utils.wrappers.success_record_wrapper import RecordSuccessByStep
+from plugrl_env_client.utils.wrappers.real_time_wrapper import RealTimeWrapper
+from plugrl_env_client.utils.wrappers.success_record_wrapper import RecordSuccessByStep
 
 
 class _OneStepEnv(gym.Env):

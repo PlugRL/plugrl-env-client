@@ -1,5 +1,5 @@
 [project]
-name = "plugrl-worker"
+name = "plugrl-env-client"
 version = "0.1.0"
 description = ""
 authors = [
@@ -8,69 +8,67 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
 dependencies = [
-    "loguru (>=0.7.3,<0.8.0)",
-    "gymnasium (>=1.2.0,<2.0.0)",
-    "dm-tree (>=0.1.9,<0.2.0)",
-    "websockets (>=15.0.1,<16.0.0)",
-    "msgpack (>=1.1.1,<2.0.0)",
-    "tyro (>=0.9.31,<0.10.0)",
-    "plugrl-client @ git+https://github.com/PlugRL/plugrl-client.git",
-    "pandas (>=2.3.3,<3.0.0)",
-    "imageio[ffmpeg] (>=2.37.2,<3.0.0)",
+    "loguru>=0.7.3,<0.8.0",
+    "gymnasium>=1.2.0,<2.0.0",
+    "dm-tree>=0.1.9,<0.2.0",
+    "websockets>=15.0.1,<16.0.0",
+    "msgpack>=1.1.1,<2.0.0",
+    "tyro>=0.9.31,<0.10.0",
+    "plugrl-protocol @ git+https://github.com/PlugRL/plugrl-protocol.git",
+    "pandas>=2.3.3,<3.0.0",
+    "imageio[ffmpeg]>=2.37.2,<3.0.0",
 ]
 
-[tool.poetry]
-packages = [{include = "plugrl_worker", from = "src"}]
+[project.scripts]
+plugrl-run-env-client = "plugrl_env_client.cli:main"
+plugrl-run-worker = "plugrl_env_client.cli:main"
 
-[tool.poetry.scripts]
-plugrl-run-worker = "plugrl_worker.cli:main"
+[project.optional-dependencies]
+robomimic = [
+    "cython<3",
+    "d4rl>=1.1,<2.0.0",
+    "patchelf>=0.17.2.4,<0.18.0",
+    "robomimic==0.3.0",
+    "robosuite<1.5.0",
+    "PyOpenGL==3.1.4",
+]
+atari = [
+    "ale-py==0.9",
+    "gymnasium[atari]>=1.2.1,<2.0.0",
+]
+classic = [
+    "gymnasium[classic-control]>=1.2.1,<2.0.0",
+]
+d4rl = [
+    "cython<3",
+    "d4rl>=1.1,<2.0.0",
+    "patchelf>=0.17.2.4,<0.18.0",
+    "gymnasium-robotics[mujoco-py]>=1.4.1,<2.0.0",
+]
+libero = [
+    "libero @ git+https://github.com/CTP314/LIBERO.git",
+]
 
-[tool.poetry.dependencies]
+[dependency-groups]
+dev = [
+    "ipdb>=0.13.13,<0.14.0",
+    "pre-commit>=4.5.1,<5.0.0",
+    "pytest>=9.0.2,<10.0.0",
+]
 
-[tool.poetry.group.robomimic.dependencies]
-cython = "<3"
-d4rl = "^1.1"
-patchelf = "^0.17.2.4"
-robomimic = "0.3.0"
-robosuite = "<1.5.0"
-pyopengl = "3.1.4"
+[tool.setuptools]
+package-dir = {"" = "src"}
 
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["plugrl_env_client*"]
 
-[tool.poetry.group.dev.dependencies]
-ipdb = "^0.13.13"
-pre-commit = "^4.5.1"
-pytest = "^9.0.2"
-
-
-[tool.poetry.group.atari.dependencies]
-ale-py = "0.9"
-gymnasium = {extras = ["atari"], version = "^1.2.1"}
-
-
-[tool.poetry.group.classic.dependencies]
-gymnasium = {extras = ["classic-control"], version = "^1.2.1"}
-
-
-
-[tool.poetry.group.d4rl.dependencies]
-cython = "<3"
-d4rl = "^1.1"
-patchelf = "^0.17.2.4"
-gymnasium-robotics = {extras = ["mujoco-py"], version = "^1.4.1"}
-
-
-
-[tool.poetry.group.libero.dependencies]
-libero = {git = "https://github.com/CTP314/LIBERO.git"}
+[tool.setuptools.package-data]
+plugrl_env_client = ["**/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-# [[tool.poetry.source]]
-# name = "mirrors"
-# url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
-# priority = "primary"
-
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"

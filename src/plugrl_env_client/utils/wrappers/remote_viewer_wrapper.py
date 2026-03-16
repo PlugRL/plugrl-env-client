@@ -12,7 +12,7 @@ from PIL import Image
 import io
 import base64
 
-from plugrl_worker.envs.base_env import Observation
+from plugrl_env_client.envs.base_env import Observation
 
 
 class RemoteViewerCommunicator:

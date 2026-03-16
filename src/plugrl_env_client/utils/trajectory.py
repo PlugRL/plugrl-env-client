@@ -1,7 +1,7 @@
 import imageio
 import pandas as pd
 import pathlib
-from plugrl_worker.envs.base_env import Observation
+from plugrl_env_client.envs.base_env import Observation
 
 
 class Recorder:

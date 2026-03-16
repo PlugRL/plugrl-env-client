@@ -1,7 +1,7 @@
 import numpy as np
 
-from plugrl_worker.envs.dummy_env import DummyEnv, DummyEnvConfig
-from plugrl_worker.envs.base_env import Observation
+from plugrl_env_client.envs.dummy_env import DummyEnv, DummyEnvConfig
+from plugrl_env_client.envs.base_env import Observation
 
 
 def test_dummy_env_fake_obs_and_action_shapes():

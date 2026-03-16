@@ -12,13 +12,16 @@ import dateutil
 import uuid
 import pathlib
 
-import plugrl_worker.envs
+import plugrl_env_client.envs
 import functools
-from plugrl_worker.utils.registration import REGISTERED_ENV_CONFIGS
-from plugrl_worker.envs.base_env import BaseEnvConfig
-from plugrl_worker.utils.trajectory import Recorder
-from plugrl_client.websocket_worker_agent import WebSocketWorkerAgent, ServerStopped
-import plugrl_worker.utils.wrappers as _wrappers
+from plugrl_env_client.utils.registration import REGISTERED_ENV_CONFIGS
+from plugrl_env_client.envs.base_env import BaseEnvConfig
+from plugrl_env_client.utils.trajectory import Recorder
+from plugrl_env_client.websocket_env_client_agent import (
+    ServerStopped,
+    WebSocketEnvClientAgent,
+)
+import plugrl_env_client.utils.wrappers as _wrappers
 
 _env_lock = multiprocessing.Lock()
 
@@ -146,13 +149,13 @@ def _run_worker(worker_id: int, args: Args):
         return
 
     try:
-        worker_agent = WebSocketWorkerAgent(
+        env_client_agent = WebSocketEnvClientAgent(
             host=args.server_host,
             port=args.server_port,
             reconnect_on_server_stop=args.reconnect_on_server_stop,
         )
         logger.info(
-            f"Connected to server with metadata: {worker_agent.get_server_metadata()}"
+            f"Connected to server with metadata: {env_client_agent.get_server_metadata()}"
         )
     except ServerStopped as e:
         logger.info(f"Server stopped normally before worker started running: {e}")
@@ -194,7 +197,7 @@ def _run_worker(worker_id: int, args: Args):
             while not (terminated or truncated):
                 if not action_plan:
                     sum_reward = 0.0
-                    action_data = worker_agent.infer(dataclasses.asdict(obs))
+                    action_data = env_client_agent.infer(dataclasses.asdict(obs))
                     action_chunk = action_data["action"]
                     replan_steps = args.replan_steps or len(action_chunk)
                     assert len(action_chunk) >= replan_steps, (
@@ -210,7 +213,7 @@ def _run_worker(worker_id: int, args: Args):
                 sum_reward += float(reward)
 
                 if not action_plan or terminated or truncated:
-                    worker_agent.feedback(
+                    env_client_agent.feedback(
                         dataclasses.asdict(obs),
                         float(sum_reward),
                         terminated,
@@ -238,7 +241,7 @@ def _main(args: Args):
     multiprocessing.set_start_method("spawn", force=True)
     logger.configure(handlers=[{"sink": sys.stdout, "level": args.log_level.upper()}])
 
-    logger.info(f"plugrl_worker version: {plugrl_worker.__version__}")
+    logger.info(f"plugrl_env_client version: {plugrl_env_client.__version__}")
     logger.info(f"Selected env: {args.uid}")
     logger.info(f"Env config: {args.env}")
 

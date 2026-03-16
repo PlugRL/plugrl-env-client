@@ -1,8 +1,8 @@
 import dataclasses
 import gymnasium as gym
 import numpy as np
-from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Observation, Action
-from plugrl_worker.utils.registration import register_env, register_env_config
+from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig, Observation, Action
+from plugrl_env_client.utils.registration import register_env, register_env_config
 
 UID = "MuJoCo-v1"
 
@@ -54,6 +54,6 @@ class MuJoCoEnv(BaseEnv):
 
 
 if __name__ == "__main__":
-    from plugrl_worker.cli import main
+    from plugrl_env_client.cli import main
 
     main()

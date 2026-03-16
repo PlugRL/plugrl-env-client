@@ -14,10 +14,10 @@ try:
     )
 except ImportError:
     raise ImportError(
-        "Atari is not installed. Please install it with the 'atari' extra, e.g. 'pip install plugrl_worker[atari]'"
+        "Atari is not installed. Please install it with the 'atari' extra, e.g. 'pip install plugrl-env-client[atari]'"
     )
-from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
-from plugrl_worker.utils.registration import register_env, register_env_config
+from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
+from plugrl_env_client.utils.registration import register_env, register_env_config
 
 UID = "Atari-v1"
 

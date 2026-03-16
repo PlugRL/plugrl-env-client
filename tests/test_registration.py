@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 import gymnasium as gym
 
-from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Observation
-from plugrl_worker.utils.registration import (
+from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig, Observation
+from plugrl_env_client.utils.registration import (
     get_env_config,
     register_env,
     register_env_config,
