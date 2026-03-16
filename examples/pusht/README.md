@@ -1,6 +1,6 @@
 # PushT Example
 
-This is an example for register PushT env to plugrl_worker.
+This is an example for registering a PushT env to `plugrl-env-client`.
 
 ## Installation
 

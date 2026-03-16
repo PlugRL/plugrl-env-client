@@ -7,8 +7,8 @@ import difflib
 import gymnasium as gym
 from loguru import logger
 
-from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig
-from plugrl_worker.utils.wrappers.success_record_wrapper import RecordSuccessByStep
+from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig
+from plugrl_env_client.utils.wrappers.success_record_wrapper import RecordSuccessByStep
 
 
 class EnvSpec:

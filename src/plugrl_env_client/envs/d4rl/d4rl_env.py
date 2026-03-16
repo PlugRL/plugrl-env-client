@@ -6,13 +6,13 @@ try:
     import d4rl.gym_mujoco  # noqa: F401
 except ImportError:
     raise ImportError(
-        'd4rl is not installed. Please install it with pip install "plugrl-worker[dr4rl]".'
+        'd4rl is not installed. Please install it with pip install "plugrl-env-client[d4rl]".'
     )
 except Exception as e:
     raise ImportError(f"An error occurred while importing d4rl: {e}")
 
-from plugrl_worker.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
-from plugrl_worker.utils.registration import register_env, register_env_config
+from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig, Action, Observation
+from plugrl_env_client.utils.registration import register_env, register_env_config
 
 UID = "D4RL-v1"
 

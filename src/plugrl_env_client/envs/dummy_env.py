@@ -2,7 +2,7 @@ import numpy as np
 import dataclasses
 
 from .base_env import BaseEnv, Observation, Action, BaseEnvConfig
-from plugrl_worker.utils.registration import register_env, register_env_config
+from plugrl_env_client.utils.registration import register_env, register_env_config
 
 UID = "Dummy-v1"
 

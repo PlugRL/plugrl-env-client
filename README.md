@@ -1,11 +1,11 @@
-# 🚀 plugrl-worker
+# 🚀 plugrl-env-client
 
-**plugrl-worker** (Vision Language Action Reinforcement Learning Infrastructure) is a foundational framework for building and running distributed reinforcement learning agents. It's designed to streamline the communication between environment workers and a centralized training server, enabling efficient and scalable RL experiments.
+**plugrl-env-client** (Vision Language Action Reinforcement Learning Infrastructure) runs environments and talks to a centralized training server, enabling scalable RL experiments.
 
 ## ✨ Features
 
   * **Distributed Communication**: Utilizes `websockets` and `msgpack` for fast, secure, and asynchronous data transfer between the central server and multiple environment workers.
-  * **Modular Design**: Separates the core infrastructure (`plugrl-worker`) from the client-side components (`plugrl-client`), allowing for independent development and deployment.
+    * **Modular Design**: Separates the environment-side runtime (`plugrl-env-client`) from the shared protocol layer (`plugrl-protocol`).
   * **Command-Line Interface**: Provides a user-friendly CLI powered by `tyro` for starting and managing RL tasks.
   * **Gymnasium Integration**: Seamlessly works with `Gymnasium` environments for standardized and flexible environment interaction.
 
@@ -13,16 +13,24 @@
 
 ## 🛠️ Installation
 
-The easiest way to get started is by cloning the repository and using Poetry to handle the dependencies.
+The easiest way to get started is by cloning the repository and using `uv` to manage the environment.
 
 1.  **Clone the repository:**
 
     ```bash
-    git clone git@github.com:CTP314/plugrl-worker.git
-    cd plugrl-worker
+    git clone git@github.com:PlugRL/plugrl-env-client.git
+    cd plugrl-env-client
     ```
 
 2.  **Install dependencies with Pip:**
+
+    **Option A: Use uv (recommended)**
+
+    ```bash
+    uv sync
+    ```
+
+    **Option B: Editable install with pip**
 
     ```bash
     pip install -e .
@@ -30,18 +38,26 @@ The easiest way to get started is by cloning the repository and using Poetry to 
 
 3. **Install Optional Environment Dependencies**
 
+    With `uv`:
+
+    ```bash
+    uv sync --extra robomimic --extra atari --extra classic
+    ```
+
     ```
     pip install -e ".[robomimic, atari, classic]"
     ```
 
 ## 🚀 Usage
 
-The `plugrl-run-worker` tool launches worker processes for specific environments.
+The `plugrl-run-env-client` tool launches one or more env client processes for specific environments.
+
+> Note: `plugrl-run-worker` is kept as a backwards-compatible alias.
 
 ### Basic Syntax
 
 ```bash
-poetry run plugrl-run-worker <ENVIRONMENT_TYPE> [OPTIONS]
+uv run plugrl-run-env-client <ENVIRONMENT_TYPE> [OPTIONS]
 ```
 
 ### Remote Viewer Usage (`--use-remote-viewer`)
@@ -65,12 +81,12 @@ To utilize this feature, you must first start the **viewer frontend** in a separ
     uvicorn plugrl_viewer.main:app --reload --port 8001
     ```
 
-2.  **Run the Worker with the Flag:**
+2.  **Run the Env Client with the Flag:**
     In your `plugrl-server` project, execute the worker command, making sure to include the `--use-remote-viewer` flag:
 
     ```bash
     # Example: Run the dummy worker and stream data to the viewer on port 8001
-    plugrl-run-worker dummy-v1 --use-remote-viewer
+    plugrl-run-env-client dummy-v1 --use-remote-viewer
     ```
 
 The worker will then attempt to establish a WebSocket connection with the viewer at the specified host and port (defaulting to `0.0.0.0:8001`) and begin streaming environment data.
@@ -90,10 +106,10 @@ Run the `dummy-v1` environment with custom parameters:
 
 ```bash
 # Run 100 episodes with 'debug' logging level
-poetry run plugrl-run-worker dummy-v1 --num-episodes 100 --log-level debug
+uv run plugrl-run-env-client dummy-v1 --num-episodes 100 --log-level debug
 
 # Run with custom environment settings (64x64 image, 4-dim action space)
-poetry run plugrl-run-worker dummy-v1 --env.img-width 64 --env.img-height 64 --env.action-dim 4
+uv run plugrl-run-env-client dummy-v1 --env.img-width 64 --env.img-height 64 --env.action-dim 4
 ```
 
 ### Get More Help
@@ -101,5 +117,5 @@ poetry run plugrl-run-worker dummy-v1 --env.img-width 64 --env.img-height 64 --e
 To see all available options for a specific environment:
 
 ```bash
-poetry run plugrl-run-worker dummy-v1 --help
+uv run plugrl-run-env-client dummy-v1 --help
 ```
