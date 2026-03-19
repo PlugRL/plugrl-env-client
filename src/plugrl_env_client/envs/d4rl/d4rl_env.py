@@ -35,6 +35,8 @@ class D4RLEnv(BaseEnv):
         total_workers: int | None = None,
     ):
         super().__init__(config=config)
+        if self.num_envs != 1:
+            raise ValueError("D4RLEnv only supports num_envs=1")
         env = gym.make(config.env_name)
         self.env = env
         self.task_name = config.env_name
@@ -61,8 +63,11 @@ class D4RLEnv(BaseEnv):
 
     def step(
         self, action: Action
-    ) -> tuple[Observation | None, float, bool, bool, dict]:
+    ) -> tuple[Observation | None, np.ndarray, np.ndarray, np.ndarray, dict]:
         if action.ndim > 1:
             action = action[0]
         obs, reward, done, info = self.env.step(action)
-        return self.prepare_obs(obs), float(reward), done, False, info
+        reward = np.array([float(reward)], dtype=np.float32)
+        terminated = np.array([bool(done)], dtype=np.bool_)
+        truncated = np.array([False], dtype=np.bool_)
+        return self.prepare_obs(obs), reward, terminated, truncated, info

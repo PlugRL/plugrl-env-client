@@ -31,6 +31,8 @@ class ClassicEnv(BaseEnv):
         total_workers: int | None = None,
     ):
         super().__init__(config=config)
+        if self.num_envs != 1:
+            raise ValueError("ClassicEnv only supports num_envs=1")
         env = gym.make(config.classic_env_name, render_mode="rgb_array")
         self.env = env
         self.game_name = config.classic_env_name
@@ -53,7 +55,10 @@ class ClassicEnv(BaseEnv):
 
     def step(
         self, action: Action
-    ) -> tuple[Observation | None, float, bool, bool, dict]:
+    ) -> tuple[Observation | None, np.ndarray, np.ndarray, np.ndarray, dict]:
         action = int(action.item())
         obs, reward, terminated, truncated, info = self.env.step(action)
-        return self.prepare_obs(obs), float(reward), terminated, truncated, info
+        reward = np.array([float(reward)], dtype=np.float32)
+        terminated = np.array([bool(terminated)], dtype=np.bool_)
+        truncated = np.array([bool(truncated)], dtype=np.bool_)
+        return self.prepare_obs(obs), reward, terminated, truncated, info

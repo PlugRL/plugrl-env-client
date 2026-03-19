@@ -39,6 +39,8 @@ class AtariEnv(BaseEnv):
         total_workers: int | None = None,
     ):
         super().__init__(config=config)
+        if self.num_envs != 1:
+            raise ValueError("AtariEnv only supports num_envs=1")
         env = gym.make(config.name, render_mode="rgb_array")
         env = NoopResetEnv(env, noop_max=30)
         env = MaxAndSkipEnv(env, skip=4)
@@ -67,7 +69,10 @@ class AtariEnv(BaseEnv):
 
     def step(
         self, action: Action
-    ) -> tuple[Observation | None, float, bool, bool, dict]:
+    ) -> tuple[Observation | None, np.ndarray, np.ndarray, np.ndarray, dict]:
         action = int(action.item())
         obs, reward, terminated, truncated, info = self.env.step(action)
-        return self.prepare_obs(obs), float(reward), terminated, truncated, info
+        reward = np.array([float(reward)], dtype=np.float32)
+        terminated = np.array([bool(terminated)], dtype=np.bool_)
+        truncated = np.array([bool(truncated)], dtype=np.bool_)
+        return self.prepare_obs(obs), reward, terminated, truncated, info

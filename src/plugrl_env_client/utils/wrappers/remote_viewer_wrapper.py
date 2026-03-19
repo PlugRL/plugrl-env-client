@@ -60,7 +60,10 @@ class RemoteViewerCommunicator:
                         nested_dict[nested_key] = nested_value
                 serialized_dict[key] = nested_dict
             else:
-                serialized_dict[key] = value
+                if isinstance(value, np.ndarray):
+                    serialized_dict[key] = value.tolist()
+                else:
+                    serialized_dict[key] = value
         return serialized_dict
 
     def _run_websocket_loop(self):

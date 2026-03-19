@@ -1,8 +1,9 @@
 import dataclasses
 import sys
 import collections
-from typing import Literal
+from typing import Literal, Any, cast
 import gymnasium as gym
+import numpy as np
 import tyro
 from loguru import logger
 import multiprocessing
@@ -128,21 +129,41 @@ def _run_worker(worker_id: int, args: Args):
     try:
         if args.use_env_lock:
             with _env_lock:
-                env = gym.make(
+                if args.max_episode_steps is None:
+                    env = gym.make_vec(
+                        args.uid,
+                        num_envs=args.env.num_envs,
+                        config=args.env,
+                        worker_id=worker_id if args.pass_worker_id else None,
+                        total_workers=args.num_workers if args.pass_worker_id else None,
+                    )
+                else:
+                    env = gym.make_vec(
+                        args.uid,
+                        num_envs=args.env.num_envs,
+                        config=args.env,
+                        max_episode_steps=args.max_episode_steps,
+                        worker_id=worker_id if args.pass_worker_id else None,
+                        total_workers=args.num_workers if args.pass_worker_id else None,
+                    )
+        else:
+            if args.max_episode_steps is None:
+                env = gym.make_vec(
                     args.uid,
+                    num_envs=args.env.num_envs,
+                    config=args.env,
+                    worker_id=worker_id if args.pass_worker_id else None,
+                    total_workers=args.num_workers if args.pass_worker_id else None,
+                )
+            else:
+                env = gym.make_vec(
+                    args.uid,
+                    num_envs=args.env.num_envs,
                     config=args.env,
                     max_episode_steps=args.max_episode_steps,
                     worker_id=worker_id if args.pass_worker_id else None,
                     total_workers=args.num_workers if args.pass_worker_id else None,
                 )
-        else:
-            env = gym.make(
-                args.uid,
-                config=args.env,
-                max_episode_steps=args.max_episode_steps,
-                worker_id=worker_id if args.pass_worker_id else None,
-                total_workers=args.num_workers if args.pass_worker_id else None,
-            )
     except Exception as e:
         logger.error(f"Failed to create environment {args.uid}: {e}")
         gc.collect()
@@ -170,11 +191,12 @@ def _run_worker(worker_id: int, args: Args):
                 f"Remote viewer enabled at {args.viewer_host}:{args.viewer_port}. Other workers share this port."
             )
             env = _wrappers.RemoteViewerWrapper(
-                env, websocket_uri=f"ws://{args.viewer_host}:{args.viewer_port}/ws/env"
+                cast(Any, env),
+                websocket_uri=f"ws://{args.viewer_host}:{args.viewer_port}/ws/env",
             )
 
     if args.use_real_time:
-        env = _wrappers.RealTimeWrapper(env, fps=args.fps)
+        env = _wrappers.RealTimeWrapper(cast(Any, env), fps=args.fps)
         logger.info(f"Real-time mode enabled at {args.fps} FPS")
 
     recorder = Recorder(
@@ -191,13 +213,18 @@ def _run_worker(worker_id: int, args: Args):
             recorder.record_frame(ep, obs)
             action_plan = collections.deque()
 
-            reward, terminated, truncated = 0.0, False, False
-            step_count, total_reward, sum_reward = 0, 0.0, 0.0
+            num_envs = int(getattr(env, "num_envs", 1))
+            reward = np.zeros((num_envs,), dtype=np.float32)
+            terminated = np.zeros((num_envs,), dtype=np.bool_)
+            truncated = np.zeros((num_envs,), dtype=np.bool_)
+            sum_reward = np.zeros((num_envs,), dtype=np.float32)
+            step_count, total_reward = 0, 0.0
 
-            while not (terminated or truncated):
+            while not (bool(np.any(terminated)) or bool(np.any(truncated))):
                 if not action_plan:
-                    sum_reward = 0.0
-                    action_data = env_client_agent.infer(dataclasses.asdict(obs))
+                    sum_reward[...] = 0.0
+                    obs_msg = dataclasses.asdict(obs)
+                    action_data = env_client_agent.infer(obs_msg)
                     action_chunk = action_data["action"]
                     replan_steps = args.replan_steps or len(action_chunk)
                     assert len(action_chunk) >= replan_steps, (
@@ -207,15 +234,23 @@ def _run_worker(worker_id: int, args: Args):
 
                 action = action_plan.popleft()
                 obs, reward, terminated, truncated, info = env.step(action)
+                reward = np.asarray(reward, dtype=np.float32)
+                terminated = np.asarray(terminated, dtype=np.bool_)
+                truncated = np.asarray(truncated, dtype=np.bool_)
                 recorder.record_frame(ep, obs)
                 step_count += 1
-                total_reward += float(reward)
-                sum_reward += float(reward)
+                total_reward += float(np.sum(reward))
+                sum_reward += reward
 
-                if not action_plan or terminated or truncated:
+                if (
+                    not action_plan
+                    or bool(np.any(terminated))
+                    or bool(np.any(truncated))
+                ):
+                    obs_msg = dataclasses.asdict(obs)
                     env_client_agent.feedback(
-                        dataclasses.asdict(obs),
-                        float(sum_reward),
+                        obs_msg,
+                        sum_reward,
                         terminated,
                         truncated,
                         info,

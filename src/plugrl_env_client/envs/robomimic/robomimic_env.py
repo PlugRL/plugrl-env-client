@@ -53,6 +53,8 @@ class RobomimicEnv(BaseEnv):
         total_workers: int | None = None,
     ):
         super().__init__(config=config)
+        if self.num_envs != 1:
+            raise ValueError("RobomimicEnv only supports num_envs=1")
 
         try:
             env_meta_json_path = ENV_META_DIR / f"{config.name}.json"
@@ -106,7 +108,16 @@ class RobomimicEnv(BaseEnv):
         action = action[0].tolist()
         obs, reward, done, info = self.env.step(action)
         agentview_image = self.render()
-        return self.prepare_obs(obs, agentview_image), reward, done, False, info
+        reward = np.array([float(reward)], dtype=np.float32)
+        terminated = np.array([bool(done)], dtype=np.bool_)
+        truncated = np.array([False], dtype=np.bool_)
+        return (
+            self.prepare_obs(obs, agentview_image),
+            reward,
+            terminated,
+            truncated,
+            info,
+        )
 
     def render(self) -> np.ndarray:
         return self.env.render(

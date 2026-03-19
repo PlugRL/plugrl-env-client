@@ -1,7 +1,15 @@
 import dataclasses
 import gymnasium as gym
+import numpy as np
 from collections import deque
-from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig, Observation, Action
+from plugrl_env_client.envs.base_env import (
+    Action,
+    BaseEnv,
+    BaseEnvConfig,
+    BoolArray,
+    Observation,
+    RewardArray,
+)
 from plugrl_env_client.utils.registration import register_env, register_env_config
 
 TASK = "Push the T-shaped block onto the T-shaped target."
@@ -58,22 +66,25 @@ class PushTEnv(BaseEnv):
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
-    ) -> tuple[Observation | None, dict]:
+    ) -> tuple[Observation, dict]:
         self.obs_queue.clear()
         raw_obs, info = self.env.reset(seed=seed, options=options)
         obs = self.prepare_obs(raw_obs)
         return obs, info
 
     def step(
-        self, action: Action
-    ) -> tuple[Observation | None, float, bool, bool, dict]:
-        raw_obs, reward, terminated, truncated, info = self.env.step(action[0])
+        self, actions: Action
+    ) -> tuple[Observation, RewardArray, BoolArray, BoolArray, dict]:
+        raw_obs, reward, terminated, truncated, info = self.env.step(actions[0])
         obs = self.prepare_obs(raw_obs)
         if self.sparse_reward:
-            reward = terminated
+            reward = float(terminated)
         if not self.early_termination:
             terminated = False
-        return obs, float(reward), terminated, truncated, info
+        reward_arr = np.asarray([float(reward)], dtype=np.float32)
+        terminated_arr = np.asarray([bool(terminated)], dtype=np.bool_)
+        truncated_arr = np.asarray([bool(truncated)], dtype=np.bool_)
+        return obs, reward_arr, terminated_arr, truncated_arr, info
 
 
 if __name__ == "__main__":

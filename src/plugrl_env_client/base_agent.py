@@ -1,5 +1,5 @@
 import abc
-from typing import Dict
+from typing import Any, Dict
 
 
 class BaseAgent(abc.ABC):
@@ -11,9 +11,9 @@ class BaseAgent(abc.ABC):
     def feedback(
         self,
         obs: Dict,
-        rewards: float,
-        terminated: bool,
-        truncated: bool,
+        rewards: Any,
+        terminated: Any,
+        truncated: Any,
         info: Dict,
     ) -> None:
         """Provide feedback to the agent."""

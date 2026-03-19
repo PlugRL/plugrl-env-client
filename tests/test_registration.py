@@ -83,20 +83,21 @@ def test_register_env_and_gym_make_works():
             obs = Observation(images={}, states={}, text="")
             return obs, {}
 
-        def step(self, action):
+        def step(self, actions):
             self._done = True
             obs = Observation(images={}, states={}, text="")
-            return obs, 1.0, True, False, {}
+            reward = np.array([1.0], dtype=np.float32)
+            terminated = np.array([True], dtype=np.bool_)
+            truncated = np.array([False], dtype=np.bool_)
+            return obs, reward, terminated, truncated, {}
 
-    env = gym.make(uid, config=Cfg())
+    env = gym.make_vec(uid, num_envs=2, config=Cfg())
     obs, info = env.reset()
     assert isinstance(obs, Observation)
 
     obs, reward, terminated, truncated, info = env.step(
         np.array([0.0], dtype=np.float32)
     )
-    assert terminated is True
-    assert float(reward) == 1.0
-    assert "episode" in info
-    assert "s" in info["episode"]
+    assert bool(np.asarray(terminated)[0]) is True
+    assert float(np.asarray(reward)[0]) == 1.0
     env.close()

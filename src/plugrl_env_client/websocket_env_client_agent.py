@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from loguru import logger
 import websockets.sync.client
@@ -192,9 +192,9 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
     def feedback(
         self,
         obs: Dict,
-        rewards: float,
-        terminated: bool,
-        truncated: bool,
+        rewards: Any,
+        terminated: Any,
+        truncated: Any,
         info: Dict,
     ) -> None:
         while True:

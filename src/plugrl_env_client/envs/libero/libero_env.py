@@ -86,6 +86,8 @@ class LiberoEnv(BaseEnv):
         total_workers: int | None = None,
     ):
         super().__init__(config=config)
+        if self.num_envs != 1:
+            raise ValueError("LiberoEnv only supports num_envs=1")
         self.config = config
         benchmark_dict = benchmark.get_benchmark_dict()
         task_suite = benchmark_dict[config.task_suite_name]()
@@ -198,13 +200,16 @@ class LiberoEnv(BaseEnv):
 
     def step(
         self, action: Action
-    ) -> tuple[Observation | None, float, bool, bool, dict]:
+    ) -> tuple[Observation | None, np.ndarray, np.ndarray, np.ndarray, dict]:
         if action.ndim > 1:
             action = action[0]
         obs, reward, done, info = self.env.step(action.tolist())
         self.current_step += 1
         truncated = self.current_step >= self.max_steps
-        return self.prepare_obs(obs), float(reward), done, truncated, info
+        reward = np.array([float(reward)], dtype=np.float32)
+        terminated = np.array([bool(done)], dtype=np.bool_)
+        truncated = np.array([bool(truncated)], dtype=np.bool_)
+        return self.prepare_obs(obs), reward, terminated, truncated, info
 
     def __del__(self):
         if hasattr(self, "env"):

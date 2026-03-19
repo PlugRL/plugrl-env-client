@@ -44,27 +44,31 @@ class DummyEnv(BaseEnv):
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> tuple:
         return self.fake_obs(), {}
 
-    def step(self, action: Action) -> tuple:
-        reward = np.random.rand()
-        terminated = np.random.rand() < self.terminated_prob
-        return self.fake_obs(), reward, terminated, False, {}
+    def step(self, actions: Action) -> tuple:
+        reward = np.random.rand(self.num_envs).astype(np.float32)
+        terminated = (np.random.rand(self.num_envs) < self.terminated_prob).astype(
+            np.bool_
+        )
+        truncated = np.zeros((self.num_envs,), dtype=np.bool_)
+        return self.fake_obs(), reward, terminated, truncated, {}
 
     def fake_action(self) -> Action:
-        return np.random.rand(1, self.action_dim).astype(np.float32)
+        return np.random.rand(self.num_envs, self.action_dim).astype(np.float32)
 
     def fake_obs(self) -> Observation:
+        b = self.num_envs
         obs = Observation(
             images={
                 "base": np.random.randint(
-                    0, 255, (1, self.img_height, self.img_width, 3)
+                    0, 255, (b, self.img_height, self.img_width, 3)
                 ).astype(np.uint8),
                 "wrist": np.random.randint(
-                    0, 255, (1, self.img_height // 2, self.img_width // 2, 3)
+                    0, 255, (b, self.img_height // 2, self.img_width // 2, 3)
                 ).astype(np.uint8),
             },
             states={
-                "robot_state": np.random.rand(1, self.state_dim),
-                "joint_angles": np.random.rand(1, self.state_dim // 2),
+                "robot_state": np.random.rand(b, self.state_dim),
+                "joint_angles": np.random.rand(b, self.state_dim // 2),
             },
             text=self.text,
         )

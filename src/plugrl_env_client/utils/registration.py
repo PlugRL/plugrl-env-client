@@ -8,7 +8,6 @@ import gymnasium as gym
 from loguru import logger
 
 from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig
-from plugrl_env_client.utils.wrappers.success_record_wrapper import RecordSuccessByStep
 
 
 class EnvSpec:
@@ -60,6 +59,41 @@ def make(env_id, **kwargs):
     return env
 
 
+def make_vec(
+    env_id: str,
+    num_envs: int = 1,
+    *,
+    config: BaseEnvConfig,
+    max_episode_steps: int | None = None,
+    worker_id: int | None = None,
+    total_workers: int | None = None,
+    **kwargs,
+):
+    """Vector entry point for `gym.make_vec(..., vectorization_mode='vector_entry_point')`.
+
+    Gymnasium will always pass `num_envs=...` for vector entry points, so we translate
+    that into `config.num_envs` and avoid forwarding `num_envs` to the env constructor.
+    """
+    cfg = deepcopy(config)
+
+    if cfg.num_envs != num_envs:
+        logger.warning(
+            f"make_vec got num_envs={num_envs} but config.num_envs={cfg.num_envs}; using num_envs"
+        )
+    cfg.num_envs = num_envs
+
+    if max_episode_steps is not None:
+        cfg.max_episode_steps = max_episode_steps
+
+    return make(
+        env_id,
+        config=cfg,
+        worker_id=worker_id,
+        total_workers=total_workers,
+        **kwargs,
+    )
+
+
 def register_env(
     uid: str,
     max_episode_steps: int | None = None,
@@ -107,19 +141,15 @@ def register_env(
             default_kwargs=deepcopy(kwargs),
         )
 
-        # Register for gym
+        # Register for gym (best-effort compatibility).
+        # NOTE: plugrl envs are VectorEnv-like; avoid gym wrappers like TimeLimit/RecordEpisodeStatistics here.
         gym.register(
             uid,
-            entry_point=partial(make, env_id=uid),
+            entry_point=None,
+            vector_entry_point=partial(make_vec, env_id=uid),
+            disable_env_checker=True,
             max_episode_steps=max_episode_steps,
-            disable_env_checker=True,  # Temporary solution as we allow empty observation spaces
             kwargs=deepcopy(kwargs),
-            additional_wrappers=(
-                gym.wrappers.RecordEpisodeStatistics.wrapper_spec(),
-                RecordSuccessByStep.wrapper_spec(
-                    best_reward_threshold_for_success=best_reward_threshold_for_success
-                ),
-            ),
         )
 
         return cls
