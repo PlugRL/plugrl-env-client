@@ -66,11 +66,13 @@ def test_register_env_and_gym_make_works():
         def __init__(
             self,
             config: Cfg,
-            worker_id: int | None = None,
-            total_workers: int | None = None,
+            process_id: int | None = None,
+            total_processes: int | None = None,
         ):
             super().__init__(
-                config=config, worker_id=worker_id, total_workers=total_workers
+                config=config,
+                process_id=process_id,
+                total_processes=total_processes,
             )
             self._done = False
             self.action_space = gym.spaces.Box(

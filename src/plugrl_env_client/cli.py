@@ -1,27 +1,12 @@
-import dataclasses
 import functools
+import multiprocessing as mp
 
 import tyro
 
 import plugrl_env_client.envs  # noqa: F401  # register envs
-from plugrl_env_client.cli_runner import run
-from plugrl_env_client.envs.base_env import BaseEnvConfig
+from plugrl_env_client.cli_runner import run, run_multiprocess
+from plugrl_env_client.cli_args import Args
 from plugrl_env_client.utils.registration import REGISTERED_ENV_CONFIGS
-
-
-@dataclasses.dataclass
-class Args:
-    uid: tyro.conf._markers.Suppress[str]
-    env: BaseEnvConfig
-
-    num_episodes: int = 1
-
-    server_host: str = "0.0.0.0"
-    server_port: int = 8000
-    reconnect_on_server_stop: bool = False
-
-    replan_steps: int | None = None
-    max_episode_steps: int | None = None
 
 
 _CONFIGS_DICT = {
@@ -38,7 +23,14 @@ def cli() -> Args:
 
 def main() -> None:
     args = cli()
-    run(args)
+
+    if args.set_start_method:
+        mp.set_start_method(args.start_method, force=True)
+
+    if args.num_procs > 1:
+        run_multiprocess(args)
+    else:
+        run(args)
 
 
 if __name__ == "__main__":

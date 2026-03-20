@@ -5,6 +5,7 @@ import gymnasium as gym
 import numpy as np
 
 from plugrl_env_client.cli_rollout import rollout
+from plugrl_env_client.cli_args import Args
 from plugrl_env_client.envs.base_env import Observation
 from plugrl_env_client.websocket_env_client_agent import WebSocketEnvClientAgent
 
@@ -99,9 +100,31 @@ def test_cli_main_parses_and_calls_run(monkeypatch):
 
     cli.main()
 
-    args = called["args"]
-    assert getattr(args, "uid") == "Dummy-v1"
-    assert getattr(args, "num_episodes") == 2
+    args = cast(Args, called["args"])
+    assert args.uid == "Dummy-v1"
+    assert args.num_episodes == 2
+
+
+def test_cli_main_num_procs_dispatches_to_multiprocess(monkeypatch):
+    import plugrl_env_client.cli as cli
+
+    called: dict[str, object] = {}
+
+    def fake_run(_args):
+        called["run"] = True
+
+    def fake_run_multiprocess(_args):
+        called["mp"] = _args.num_procs
+
+    monkeypatch.setattr(cli, "run", fake_run)
+    monkeypatch.setattr(cli, "run_multiprocess", fake_run_multiprocess)
+    monkeypatch.setattr(sys, "argv", ["prog", "dummy-v1", "--num-procs", "2"])
+
+    cli.main()
+
+    assert "mp" in called
+    assert called["mp"] == 2
+    assert "run" not in called
 
 
 def test_rollout_infer_feedback_and_partial_reset_semantics():

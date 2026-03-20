@@ -31,10 +31,14 @@ class DummyEnv(BaseEnv):
     def __init__(
         self,
         config: DummyEnvConfig,
-        worker_id: int | None = None,
-        total_workers: int | None = None,
+        process_id: int | None = None,
+        total_processes: int | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(
+            config=config,
+            process_id=process_id,
+            total_processes=total_processes,
+        )
         self.img_width = config.img_width
         self.img_height = config.img_height
         self.action_dim = config.action_dim

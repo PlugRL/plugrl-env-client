@@ -1,4 +1,6 @@
 import dataclasses
+from typing import Any, cast
+
 import numpy as np
 import gymnasium as gym
 
@@ -42,20 +44,24 @@ class AtariEnv(BaseEnv):
     def __init__(
         self,
         config: AtariConfig,
-        worker_id: int | None = None,
-        total_workers: int | None = None,
+        process_id: int | None = None,
+        total_processes: int | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(
+            config=config,
+            process_id=process_id,
+            total_processes=total_processes,
+        )
         if self.num_envs != 1:
             raise ValueError("AtariEnv only supports num_envs=1")
         env = gym.make(config.name, render_mode="rgb_array")
         env = NoopResetEnv(env, noop_max=30)
         env = MaxAndSkipEnv(env, skip=4)
         env = EpisodicLifeEnv(env)
-        get_action_meanings = getattr(env.unwrapped, "get_action_meanings", None)
-        action_meanings = (
-            get_action_meanings() if callable(get_action_meanings) else None
-        )
+        try:
+            action_meanings = cast(Any, env.unwrapped).get_action_meanings()
+        except AttributeError:
+            action_meanings = None
         if isinstance(action_meanings, (list, tuple)) and "FIRE" in action_meanings:
             env = FireResetEnv(env)
         env = gym.wrappers.ResizeObservation(env, (84, 84))

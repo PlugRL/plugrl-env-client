@@ -49,10 +49,14 @@ class RobomimicEnv(BaseEnv):
     def __init__(
         self,
         config: RobomimicConfig,
-        worker_id: int | None = None,
-        total_workers: int | None = None,
+        process_id: int | None = None,
+        total_processes: int | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(
+            config=config,
+            process_id=process_id,
+            total_processes=total_processes,
+        )
         if self.num_envs != 1:
             raise ValueError("RobomimicEnv only supports num_envs=1")
 

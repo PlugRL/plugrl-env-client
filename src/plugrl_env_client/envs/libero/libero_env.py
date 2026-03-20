@@ -82,10 +82,14 @@ class LiberoEnv(BaseEnv):
     def __init__(
         self,
         config: LiberoConfig,
-        worker_id: int | None = None,
-        total_workers: int | None = None,
+        process_id: int | None = None,
+        total_processes: int | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(
+            config=config,
+            process_id=process_id,
+            total_processes=total_processes,
+        )
         if self.num_envs != 1:
             raise ValueError("LiberoEnv only supports num_envs=1")
         self.config = config
@@ -93,10 +97,8 @@ class LiberoEnv(BaseEnv):
         task_suite = benchmark_dict[config.task_suite_name]()
         self.task_suite = task_suite
         self.num_tasks_in_suite = task_suite.get_num_tasks()
-        self.worker_id = worker_id
-        self.total_workers = total_workers
-        if worker_id is not None:
-            self.task_id = worker_id % self.num_tasks_in_suite
+        if process_id is not None:
+            self.task_id = process_id % self.num_tasks_in_suite
         else:
             self.task_id = config.task_id % self.num_tasks_in_suite
         task = task_suite.get_task(self.task_id)
@@ -169,20 +171,22 @@ class LiberoEnv(BaseEnv):
             if self.config.randomize_initial_state:
                 intial_states_idx = np.random.randint(len(self.initial_states))
             else:
-                if self.worker_id is not None and self.total_workers is not None:
-                    worker_id = self.worker_id
-                    total_workers = self.total_workers
-                    assert total_workers % self.num_tasks_in_suite == 0, (
-                        "Total workers must be multiple of number of tasks in suite."
+                if self.process_id is not None and self.total_processes is not None:
+                    process_id = self.process_id
+                    total_processes = self.total_processes
+                    assert total_processes % self.num_tasks_in_suite == 0, (
+                        "Total processes must be multiple of number of tasks in suite."
                     )
-                    num_workers_per_task = total_workers // self.num_tasks_in_suite
-                    assert len(self.initial_states) % num_workers_per_task == 0, (
-                        "Number of initial states must be multiple of number of workers per task."
+                    num_processes_per_task = total_processes // self.num_tasks_in_suite
+                    assert len(self.initial_states) % num_processes_per_task == 0, (
+                        "Number of initial states must be multiple of number of processes per task."
                     )
-                    states_per_worker = len(self.initial_states) // num_workers_per_task
+                    states_per_process = (
+                        len(self.initial_states) // num_processes_per_task
+                    )
                     intial_states_idx = (
-                        worker_id // self.num_tasks_in_suite
-                    ) * states_per_worker + (self.total_episodes % states_per_worker)
+                        process_id // self.num_tasks_in_suite
+                    ) * states_per_process + (self.total_episodes % states_per_process)
                 else:
                     intial_states_idx = self.total_episodes % len(self.initial_states)
             initial_state = self.initial_states[intial_states_idx]
@@ -212,5 +216,11 @@ class LiberoEnv(BaseEnv):
         return self.prepare_obs(obs), reward, terminated, truncated, info
 
     def __del__(self):
-        if hasattr(self, "env"):
-            self.env.close()
+        try:
+            env = self.env
+        except Exception:
+            return
+        try:
+            env.close()
+        except Exception:
+            return

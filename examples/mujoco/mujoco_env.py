@@ -27,10 +27,14 @@ class MuJoCoEnv(BaseEnv):
     def __init__(
         self,
         config: MuJoCoConfig,
-        worker_id: int | None = None,
-        total_workers: int | None = None,
+        process_id: int | None = None,
+        total_processes: int | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(
+            config=config,
+            process_id=process_id,
+            total_processes=total_processes,
+        )
         env = gym.make(config.name, render_mode="rgb_array")
         self.env = env
         self.task_name = config.name

@@ -32,12 +32,14 @@ def _select_info(
 def _get_action_spec(
     env: gym.vector.VectorEnv, *, num_envs: int
 ) -> tuple[tuple[int, ...], np.dtype]:
-    space = getattr(env, "single_action_space", None) or getattr(
-        env, "action_space", None
-    )
-    if space is None:
-        raise ValueError(
-            "Env must expose action space via single_action_space/action_space"
-        )
+    try:
+        space = env.single_action_space
+    except AttributeError:
+        try:
+            space = env.action_space
+        except AttributeError as exc:
+            raise ValueError(
+                "Env must expose action space via single_action_space/action_space"
+            ) from exc
     shape = tuple(map(int, space.shape))
     return (shape[1:] if shape[:1] == (num_envs,) else shape), np.dtype(space.dtype)

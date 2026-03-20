@@ -31,10 +31,14 @@ class D4RLEnv(BaseEnv):
     def __init__(
         self,
         config: D4RLConfig,
-        worker_id: int | None = None,
-        total_workers: int | None = None,
+        process_id: int | None = None,
+        total_processes: int | None = None,
     ):
-        super().__init__(config=config)
+        super().__init__(
+            config=config,
+            process_id=process_id,
+            total_processes=total_processes,
+        )
         if self.num_envs != 1:
             raise ValueError("D4RLEnv only supports num_envs=1")
         env = gym.make(config.env_name)

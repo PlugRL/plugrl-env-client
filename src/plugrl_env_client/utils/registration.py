@@ -65,8 +65,8 @@ def make_vec(
     *,
     config: BaseEnvConfig,
     max_episode_steps: int | None = None,
-    worker_id: int | None = None,
-    total_workers: int | None = None,
+    process_id: int | None = None,
+    total_processes: int | None = None,
     **kwargs,
 ):
     """Vector entry point for `gym.make_vec(..., vectorization_mode='vector_entry_point')`.
@@ -88,8 +88,8 @@ def make_vec(
     return make(
         env_id,
         config=cfg,
-        worker_id=worker_id,
-        total_workers=total_workers,
+        process_id=process_id,
+        total_processes=total_processes,
         **kwargs,
     )
 
