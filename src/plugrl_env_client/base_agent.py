@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 class BaseAgent(abc.ABC):
     @abc.abstractmethod
-    def infer(self, obs: Dict) -> Dict:
+    def infer(self, obs: Dict, env_indices: Any) -> Dict:
         """Infer actions from observations."""
 
     @abc.abstractmethod
@@ -15,6 +15,7 @@ class BaseAgent(abc.ABC):
         terminated: Any,
         truncated: Any,
         info: Dict,
+        env_indices: Any,
     ) -> None:
         """Provide feedback to the agent."""
 

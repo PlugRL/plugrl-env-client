@@ -6,10 +6,10 @@ import pathlib
 import numpy as np
 
 try:
-    import robomimic
-    import robomimic.envs.env_robosuite
-    import robomimic.utils.env_utils as _env_utils
-    import robomimic.utils.obs_utils as _obs_utils
+    import robomimic  # type: ignore
+    import robomimic.envs.env_robosuite  # type: ignore
+    import robomimic.utils.env_utils as _env_utils  # type: ignore
+    import robomimic.utils.obs_utils as _obs_utils  # type: ignore
 except ImportError:
     raise ImportError(
         "Robomimic is not installed. Please install it with the 'robomimic' extra, e.g. 'pip install plugrl-env-client[robomimic]'"
@@ -98,16 +98,20 @@ class RobomimicEnv(BaseEnv):
             text=text,
         )
 
-    def reset(self, *, seed: int | None = None, options: dict | None = None) -> tuple:
+    def reset(
+        self, *, seed: int | None = None, options: dict | None = None
+    ) -> tuple[Observation, dict]:
         obs = self.env.reset()
-        agentview_image = self.render()
+        agentview_image = self._render_agentview_image()
         return self.prepare_obs(obs, agentview_image), {}
 
-    def step(self, action: Action) -> tuple:
-        assert action.shape[0] == 1, "Batch size must be 1 for robomimic env"
-        action = action[0].tolist()
+    def step(
+        self, actions: Action
+    ) -> tuple[Observation, np.ndarray, np.ndarray, np.ndarray, dict]:
+        assert actions.shape[0] == 1, "Batch size must be 1 for robomimic env"
+        action = actions[0].tolist()
         obs, reward, done, info = self.env.step(action)
-        agentview_image = self.render()
+        agentview_image = self._render_agentview_image()
         reward = np.array([float(reward)], dtype=np.float32)
         terminated = np.array([bool(done)], dtype=np.bool_)
         truncated = np.array([False], dtype=np.bool_)
@@ -119,10 +123,13 @@ class RobomimicEnv(BaseEnv):
             info,
         )
 
-    def render(self) -> np.ndarray:
+    def _render_agentview_image(self) -> np.ndarray:
         return self.env.render(
             mode="rgb_array",
             height=self.agentview_image_size[0],
             width=self.agentview_image_size[1],
             camera_name="agentview",
         )
+
+    def render(self) -> tuple[np.ndarray, ...] | None:
+        return (self._render_agentview_image(),)

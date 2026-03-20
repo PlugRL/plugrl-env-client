@@ -26,6 +26,7 @@ class DummyEnv(BaseEnv):
     state_dim: int
     text: str
     terminated_prob: float = 0.01
+    _obs: Observation | None = None
 
     def __init__(
         self,
@@ -42,7 +43,29 @@ class DummyEnv(BaseEnv):
         self.terminated_prob = config.terminated_prob
 
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> tuple:
-        return self.fake_obs(), {}
+        if self._obs is None:
+            self._obs = self.fake_obs()
+
+        reset_indices = None
+        if options is not None:
+            reset_indices = options.get("reset_indices")
+
+        if reset_indices is None:
+            self._obs = self.fake_obs()
+            return self._obs, {}
+
+        indices = np.asarray(reset_indices, dtype=np.int64)
+        if indices.size == 0:
+            return self._obs, {}
+
+        new_obs = self.fake_obs()
+        assert self._obs is not None
+        for key in self._obs.images:
+            self._obs.images[key][indices] = new_obs.images[key][indices]
+        for key in self._obs.states:
+            self._obs.states[key][indices] = new_obs.states[key][indices]
+        self._obs.text[indices] = new_obs.text[indices]
+        return self._obs, {}
 
     def step(self, actions: Action) -> tuple:
         reward = np.random.rand(self.num_envs).astype(np.float32)
@@ -50,7 +73,9 @@ class DummyEnv(BaseEnv):
             np.bool_
         )
         truncated = np.zeros((self.num_envs,), dtype=np.bool_)
-        return self.fake_obs(), reward, terminated, truncated, {}
+        obs = self.fake_obs()
+        self._obs = obs
+        return obs, reward, terminated, truncated, {}
 
     def fake_action(self) -> Action:
         return np.random.rand(self.num_envs, self.action_dim).astype(np.float32)

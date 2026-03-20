@@ -1,7 +1,14 @@
 import dataclasses
 import gymnasium as gym
 import numpy as np
-from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig, Observation, Action
+from plugrl_env_client.envs.base_env import (
+    Action,
+    BaseEnv,
+    BaseEnvConfig,
+    BoolArray,
+    Observation,
+    RewardArray,
+)
 from plugrl_env_client.utils.registration import register_env, register_env_config
 
 UID = "MuJoCo-v1"
@@ -42,15 +49,21 @@ class MuJoCoEnv(BaseEnv):
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
-    ) -> tuple[Observation | None, dict]:
+    ) -> tuple[Observation, dict]:
         obs, info = self.env.reset(seed=seed, options=options)
         return self.prepare_obs(obs), info
 
     def step(
-        self, action: Action
-    ) -> tuple[Observation | None, float, bool, bool, dict]:
-        obs, reward, terminated, truncated, info = self.env.step(action[0])
-        return self.prepare_obs(obs), float(reward), terminated, truncated, info
+        self, actions: Action
+    ) -> tuple[Observation, RewardArray, BoolArray, BoolArray, dict]:
+        obs, reward, terminated, truncated, info = self.env.step(actions[0])
+        return (
+            self.prepare_obs(obs),
+            np.asarray([float(reward)], dtype=np.float32),
+            np.asarray([bool(terminated)], dtype=np.bool_),
+            np.asarray([bool(truncated)], dtype=np.bool_),
+            info,
+        )
 
 
 if __name__ == "__main__":
