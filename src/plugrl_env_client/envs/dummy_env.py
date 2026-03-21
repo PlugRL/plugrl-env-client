@@ -1,5 +1,6 @@
 import numpy as np
 import dataclasses
+import gymnasium as gym
 
 from .base_env import BaseEnv, Observation, Action, BaseEnvConfig
 from plugrl_env_client.utils.registration import register_env, register_env_config
@@ -45,6 +46,14 @@ class DummyEnv(BaseEnv):
         self.state_dim = config.state_dim
         self.text = config.text
         self.terminated_prob = config.terminated_prob
+
+        self.single_action_space = gym.spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(self.action_dim,),
+            dtype=np.float32,
+        )
+        self.action_space = self.single_action_space
 
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> tuple:
         if self._obs is None:

@@ -131,7 +131,13 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
         logger.warning("Connection closed. Attempting to re-establish connection.")
         self._ws, self._server_metadata = self._wait_for_server()
 
-    def infer(self, obs: Dict, env_indices: Any) -> Dict:  # noqa: UP006
+    def infer(
+        self,
+        obs: Dict,
+        *,
+        env_indices: Any,
+        step_ids: Any,
+    ) -> Dict:  # noqa: UP006
         while True:
             self._ensure_connection()
             ws = self._ws
@@ -144,6 +150,7 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
                         "message_type": str(MessageType.INFER),
                         "data": obs,
                         "env_indices": env_indices,
+                        "step_ids": step_ids,
                     }
                 )
                 ws.send(packed_data)
@@ -200,7 +207,9 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
         terminated: Any,
         truncated: Any,
         info: Dict,
+        *,
         env_indices: Any,
+        step_ids: Any,
     ) -> None:
         while True:
             self._ensure_connection()
@@ -213,6 +222,7 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
                     {
                         "message_type": str(MessageType.FEEDBACK),
                         "env_indices": env_indices,
+                        "step_ids": step_ids,
                         "data": {
                             "obs": obs,
                             "rewards": rewards,

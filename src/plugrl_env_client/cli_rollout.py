@@ -30,12 +30,19 @@ def rollout(
     plan_len = np.zeros((num_envs,), dtype=np.int32)
     chunk_reward = np.zeros((num_envs,), dtype=np.float32)
 
+    # Macro-step id per env (increments once per FEEDBACK for that env).
+    step_id = np.zeros((num_envs,), dtype=np.int64)
+
     finished_episodes = 0
     while finished_episodes < num_episodes:
         need_infer = np.nonzero(plan_pos >= plan_len)[0]
         if need_infer.size:
             obs_msg = dataclasses.asdict(_select_obs(obs, need_infer))
-            action_chunk = agent.infer(obs_msg, need_infer)["action"]
+            action_chunk = agent.infer(
+                obs_msg,
+                env_indices=need_infer,
+                step_ids=step_id[need_infer],
+            )["action"]
 
             steps = replan_steps or len(action_chunk)
             if len(action_chunk) < steps:
@@ -94,9 +101,12 @@ def rollout(
                 truncated=truncated[feedback_indices],
                 info=_select_info(info, feedback_indices, num_envs=num_envs),
                 env_indices=feedback_indices,
+                step_ids=step_id[feedback_indices],
             )
             chunk_reward[feedback_indices] = 0.0
+            step_id[feedback_indices] += 1
 
         if done_indices.size:
             finished_episodes += done_indices.size
             obs, info = env.reset(options={"reset_indices": done_indices})
+            step_id[done_indices] = 0

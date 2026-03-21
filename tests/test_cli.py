@@ -16,7 +16,7 @@ class _FakeAgent:
         self.infer_calls: list[np.ndarray] = []
         self.feedback_calls: list[dict] = []
 
-    def infer(self, obs: dict, env_indices: np.ndarray):
+    def infer(self, obs: dict, *, env_indices: np.ndarray, step_ids: np.ndarray):
         self.infer_calls.append(np.asarray(env_indices))
         return {"action": self._action_chunk}
 
@@ -29,6 +29,7 @@ class _FakeAgent:
         truncated: np.ndarray,
         info: dict,
         env_indices: np.ndarray,
+        step_ids: np.ndarray,
     ) -> None:
         self.feedback_calls.append(
             {
@@ -37,6 +38,7 @@ class _FakeAgent:
                 "terminated": np.asarray(terminated),
                 "truncated": np.asarray(truncated),
                 "info": info,
+                "step_ids": np.asarray(step_ids),
             }
         )
 
