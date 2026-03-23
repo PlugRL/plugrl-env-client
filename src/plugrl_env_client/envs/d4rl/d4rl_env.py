@@ -46,6 +46,10 @@ class D4RLEnv(BaseEnv):
         self.task_name = config.env_name
         self.use_image = config.use_image
 
+    @property
+    def single_action_space(self) -> gym.Space:
+        return self.env.action_space
+
     def prepare_obs(self, obs: np.ndarray) -> Observation:
         if self.use_image:
             frame = self.env.render(mode="rgb_array")
@@ -61,17 +65,18 @@ class D4RLEnv(BaseEnv):
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
-    ) -> tuple[Observation | None, dict]:
+    ) -> tuple[Observation, dict]:
         obs, info = self.env.reset(seed=seed, options=options, return_info=True)
         return self.prepare_obs(obs), info
 
     def step(
-        self, action: Action
-    ) -> tuple[Observation | None, np.ndarray, np.ndarray, np.ndarray, dict]:
-        if action.ndim > 1:
-            action = action[0]
-        obs, reward, done, info = self.env.step(action)
+        self, actions: Action
+    ) -> tuple[Observation, np.ndarray, np.ndarray, np.ndarray, dict]:
+        if actions.ndim > 1:
+            actions = actions[0]
+        obs, reward, done, info = self.env.step(actions)
         reward = np.array([float(reward)], dtype=np.float32)
         terminated = np.array([bool(done)], dtype=np.bool_)
         truncated = np.array([False], dtype=np.bool_)
+        info = {k: [v] for k, v in info.items()}
         return self.prepare_obs(obs), reward, terminated, truncated, info

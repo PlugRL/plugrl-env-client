@@ -9,6 +9,11 @@ from loguru import logger
 
 from plugrl_env_client.envs.base_env import BaseEnv, BaseEnvConfig
 
+from plugrl_env_client.utils.wrappers.episode_stats_wrapper import (
+    VectorEpisodeStatsWrapper,
+)
+from plugrl_env_client.utils.wrappers.time_limit_wrapper import TimeLimitWrapper
+
 
 class EnvSpec:
     def __init__(
@@ -16,11 +21,13 @@ class EnvSpec:
         uid: str,
         cls: Type[BaseEnv],
         max_episode_steps: int | None = None,
+        best_reward_threshold_for_success: float | None = None,
         default_kwargs: dict | None = None,
     ):
         self.uid = uid
         self.cls = cls
         self.max_episode_steps = max_episode_steps
+        self.best_reward_threshold_for_success = best_reward_threshold_for_success
         self.default_kwargs = default_kwargs if default_kwargs is not None else {}
 
     def make(self, **kwargs):
@@ -36,6 +43,7 @@ def register(
     name: str,
     cls: Type[BaseEnv],
     max_episode_steps: int | None = None,
+    best_reward_threshold_for_success: float | None = None,
     default_kwargs: dict | None = None,
 ):
     if name in REGISTERED_ENVS:
@@ -47,6 +55,7 @@ def register(
         name,
         cls,
         max_episode_steps=max_episode_steps,
+        best_reward_threshold_for_success=best_reward_threshold_for_success,
         default_kwargs=default_kwargs,
     )
 
@@ -56,6 +65,14 @@ def make(env_id, **kwargs):
         raise KeyError("Env {} not found in registry".format(env_id))
     env_spec = REGISTERED_ENVS[env_id]
     env = env_spec.make(**kwargs)
+
+    env = VectorEpisodeStatsWrapper(
+        env,
+        best_reward_threshold_for_success=env_spec.best_reward_threshold_for_success,
+    )
+    if env_spec.max_episode_steps is not None:
+        env = TimeLimitWrapper(env, max_episode_steps=env_spec.max_episode_steps)
+
     return env
 
 
@@ -138,6 +155,7 @@ def register_env(
             uid,
             cls,
             max_episode_steps=max_episode_steps,
+            best_reward_threshold_for_success=best_reward_threshold_for_success,
             default_kwargs=deepcopy(kwargs),
         )
 
@@ -148,7 +166,6 @@ def register_env(
             entry_point=None,
             vector_entry_point=partial(make_vec, env_id=uid),
             disable_env_checker=True,
-            max_episode_steps=max_episode_steps,
             kwargs=deepcopy(kwargs),
         )
 

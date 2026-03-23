@@ -82,15 +82,15 @@ def test_register_env_and_gym_make_works():
 
         def reset(self, *, seed: int | None = None, options: dict | None = None):
             self._done = False
-            obs = Observation(images={}, states={}, text="")
+            obs = Observation(images={}, states={}, text=[""] * self.num_envs)
             return obs, {}
 
         def step(self, actions):
             self._done = True
-            obs = Observation(images={}, states={}, text="")
-            reward = np.array([1.0], dtype=np.float32)
-            terminated = np.array([True], dtype=np.bool_)
-            truncated = np.array([False], dtype=np.bool_)
+            obs = Observation(images={}, states={}, text=[""] * self.num_envs)
+            reward = np.ones((self.num_envs,), dtype=np.float32)
+            terminated = np.ones((self.num_envs,), dtype=np.bool_)
+            truncated = np.zeros((self.num_envs,), dtype=np.bool_)
             return obs, reward, terminated, truncated, {}
 
     env = gym.make_vec(uid, num_envs=2, config=Cfg())
@@ -102,4 +102,53 @@ def test_register_env_and_gym_make_works():
     )
     assert bool(np.asarray(terminated)[0]) is True
     assert float(np.asarray(reward)[0]) == 1.0
+    assert "episode" in info
+    assert np.allclose(np.asarray(info["episode"]["r"], dtype=np.float32), [1.0, 1.0])
+    assert np.all(np.asarray(info["episode"]["l"], dtype=np.int32) == 1)
+    assert not np.any(np.asarray(info["episode"]["s"], dtype=np.bool_))
+    env.close()
+
+
+def test_best_reward_threshold_for_success_records_success():
+    uid = f"UnitTestEnvSuccess-{uuid.uuid4()}"
+
+    @register_env_config(uid)
+    @dataclasses.dataclass
+    class Cfg(BaseEnvConfig):
+        pass
+
+    @register_env(uid, best_reward_threshold_for_success=0.5)
+    class Env(BaseEnv):
+        def __init__(
+            self,
+            config: Cfg,
+            process_id: int | None = None,
+            total_processes: int | None = None,
+        ):
+            super().__init__(
+                config=config,
+                process_id=process_id,
+                total_processes=total_processes,
+            )
+            self.action_space = gym.spaces.Box(
+                low=-1.0, high=1.0, shape=(1,), dtype=np.float32
+            )
+            self.observation_space = gym.spaces.Dict({})
+
+        def reset(self, *, seed: int | None = None, options: dict | None = None):
+            obs = Observation(images={}, states={}, text="")
+            return obs, {}
+
+        def step(self, actions):
+            obs = Observation(images={}, states={}, text="")
+            reward = np.array([1.0], dtype=np.float32)
+            terminated = np.array([True], dtype=np.bool_)
+            truncated = np.array([False], dtype=np.bool_)
+            return obs, reward, terminated, truncated, {}
+
+    env = gym.make_vec(uid, num_envs=1, config=Cfg())
+    env.reset()
+    _, _, terminated, _, info = env.step(np.array([0.0], dtype=np.float32))
+    assert bool(np.asarray(terminated)[0]) is True
+    assert info["episode"]["s"] is True
     env.close()
