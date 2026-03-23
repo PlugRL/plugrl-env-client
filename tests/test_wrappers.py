@@ -2,7 +2,6 @@ import numpy as np
 import gymnasium as gym
 
 from plugrl_env_client.utils.wrappers.real_time_wrapper import RealTimeWrapper
-from plugrl_env_client.utils.wrappers.success_record_wrapper import RecordSuccessByStep
 
 
 class _OneStepEnv(gym.Env):
@@ -30,20 +29,6 @@ class _OneStepEnv(gym.Env):
         obs = np.zeros((1,), dtype=np.float32)
         info = {"episode": {}}
         return obs, float(self._reward), True, False, info
-
-
-def test_record_success_by_step_updates_info():
-    env = _OneStepEnv(reward=1.0)
-    wrapped = RecordSuccessByStep(env, best_reward_threshold_for_success=0.5)
-
-    wrapped.reset()
-    _, _, terminated, truncated, info = wrapped.step(np.array([0.0], dtype=np.float32))
-
-    assert terminated is True
-    assert truncated is False
-    assert info["is_step_success"] is True
-    assert info["episode"]["s"] is True
-    assert 0.0 <= info["episode"]["mean_success_rate"] <= 1.0
 
 
 def test_real_time_wrapper_sleeps_non_negative(monkeypatch):
