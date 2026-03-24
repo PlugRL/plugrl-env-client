@@ -1,0 +1,4 @@
+-e ../..
+playground==0.0.5
+jax==0.4.38; platform_system != "Linux"
+jax[cuda12]==0.4.38; platform_system == "Linux"
