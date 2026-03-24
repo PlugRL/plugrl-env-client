@@ -20,7 +20,7 @@ UID = "D4RL-v1"
 @register_env_config(UID)
 @dataclasses.dataclass
 class D4RLConfig(BaseEnvConfig):
-    env_name: str = "hopper-medium-v2"
+    name: str = "hopper-medium-v2"
     use_image: bool = False
 
 
@@ -31,19 +31,21 @@ class D4RLEnv(BaseEnv):
     def __init__(
         self,
         config: D4RLConfig,
+        num_envs: int = 1,
         process_id: int | None = None,
         total_processes: int | None = None,
     ):
         super().__init__(
             config=config,
+            num_envs=num_envs,
             process_id=process_id,
             total_processes=total_processes,
         )
         if self.num_envs != 1:
             raise ValueError("D4RLEnv only supports num_envs=1")
-        env = gym.make(config.env_name)
+        env = gym.make(config.name)
         self.env = env
-        self.task_name = config.env_name
+        self.task_name = config.name
         self.use_image = config.use_image
 
     @property

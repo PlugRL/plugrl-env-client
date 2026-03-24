@@ -82,7 +82,6 @@ BoolArray = Annotated[npt.NDArray[np.bool_], ("b",)]
 @dataclasses.dataclass
 class BaseEnvConfig:
     max_episode_steps: int | None = None
-    num_envs: int = 1
 
 
 class BaseEnv(VectorEnv[Observation, Action, np.ndarray], abc.ABC):
@@ -91,13 +90,14 @@ class BaseEnv(VectorEnv[Observation, Action, np.ndarray], abc.ABC):
     def __init__(
         self,
         config: BaseEnvConfig,
+        num_envs: int = 1,
         process_id: int | None = None,
         total_processes: int | None = None,
     ):
         self.config = config
         self.process_id = process_id
         self.total_processes = total_processes
-        self.num_envs = config.num_envs
+        self.num_envs = int(num_envs)
 
     @abc.abstractmethod
     def reset(

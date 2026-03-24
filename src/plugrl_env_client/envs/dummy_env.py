@@ -32,11 +32,13 @@ class DummyEnv(BaseEnv):
     def __init__(
         self,
         config: DummyEnvConfig,
+        num_envs: int = 1,
         process_id: int | None = None,
         total_processes: int | None = None,
     ):
         super().__init__(
             config=config,
+            num_envs=num_envs,
             process_id=process_id,
             total_processes=total_processes,
         )

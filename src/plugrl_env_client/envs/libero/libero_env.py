@@ -82,11 +82,13 @@ class LiberoEnv(BaseEnv):
     def __init__(
         self,
         config: LiberoConfig,
+        num_envs: int = 1,
         process_id: int | None = None,
         total_processes: int | None = None,
     ):
         super().__init__(
             config=config,
+            num_envs=num_envs,
             process_id=process_id,
             total_processes=total_processes,
         )
@@ -163,7 +165,7 @@ class LiberoEnv(BaseEnv):
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
-    ) -> tuple[Observation | None, dict]:
+    ) -> tuple[Observation, dict]:
         if options is None:
             options = {}
 
@@ -204,7 +206,7 @@ class LiberoEnv(BaseEnv):
 
     def step(
         self, action: Action
-    ) -> tuple[Observation | None, np.ndarray, np.ndarray, np.ndarray, dict]:
+    ) -> tuple[Observation, np.ndarray, np.ndarray, np.ndarray, dict]:
         if action.ndim > 1:
             action = action[0]
         obs, reward, done, info = self.env.step(action.tolist())

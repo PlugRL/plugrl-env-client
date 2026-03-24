@@ -3,8 +3,9 @@ import dataclasses
 import gymnasium as gym
 import numpy as np
 
-from plugrl_env_client.cli_utils import _get_action_spec, _select_info, _select_obs
-from plugrl_env_client.websocket_env_client_agent import WebSocketEnvClientAgent
+from plugrl_env_client.agent.websocket_env_client_agent import WebSocketEnvClientAgent
+from plugrl_env_client.recorder import Recorder
+from plugrl_env_client.utils.rollout import _get_action_spec, _select_info, _select_obs
 
 
 def rollout(
@@ -14,8 +15,11 @@ def rollout(
     num_episodes: int,
     replan_steps: int | None,
     num_envs: int,
+    recorder: Recorder | None = None,
 ) -> None:
     obs, info = env.reset()
+    if recorder is not None:
+        recorder.on_reset(obs, info, reset_indices=None)
 
     plan_capacity = int(replan_steps or 0)
     expected_action_shape, expected_action_dtype = _get_action_spec(
@@ -30,7 +34,6 @@ def rollout(
     plan_len = np.zeros((num_envs,), dtype=np.int32)
     chunk_reward = np.zeros((num_envs,), dtype=np.float32)
 
-    # Macro-step id per env (increments once per FEEDBACK for that env).
     step_id = np.zeros((num_envs,), dtype=np.int64)
 
     finished_episodes = 0
@@ -78,6 +81,8 @@ def rollout(
 
         actions = action_plan[np.arange(num_envs), plan_pos]
         obs, reward, terminated, truncated, info = env.step(actions)
+        if recorder is not None:
+            recorder.on_step(obs, reward, terminated, truncated, info)
 
         plan_pos += 1
 
@@ -107,6 +112,10 @@ def rollout(
             step_id[feedback_indices] += 1
 
         if done_indices.size:
+            if recorder is not None:
+                recorder.on_episode_done(done_indices, obs, info)
             finished_episodes += done_indices.size
             obs, info = env.reset(options={"reset_indices": done_indices})
+            if recorder is not None:
+                recorder.on_reset(obs, info, reset_indices=done_indices)
             step_id[done_indices] = 0

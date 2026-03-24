@@ -30,10 +30,10 @@ class EnvSpec:
         self.best_reward_threshold_for_success = best_reward_threshold_for_success
         self.default_kwargs = default_kwargs if default_kwargs is not None else {}
 
-    def make(self, **kwargs):
+    def make(self, config: BaseEnvConfig, num_envs: int = 1, **kwargs):
         _kwargs = self.default_kwargs.copy()
         _kwargs.update(kwargs)
-        return self.cls(**_kwargs)
+        return self.cls(config=config, num_envs=num_envs, **_kwargs)
 
 
 REGISTERED_ENVS: Dict[str, EnvSpec] = {}
@@ -60,11 +60,11 @@ def register(
     )
 
 
-def make(env_id, **kwargs):
+def make(env_id, config: BaseEnvConfig, num_envs: int = 1, **kwargs):
     if env_id not in REGISTERED_ENVS:
         raise KeyError("Env {} not found in registry".format(env_id))
     env_spec = REGISTERED_ENVS[env_id]
-    env = env_spec.make(**kwargs)
+    env = env_spec.make(config=config, num_envs=num_envs, **kwargs)
 
     env = VectorEpisodeStatsWrapper(
         env,
@@ -88,16 +88,10 @@ def make_vec(
 ):
     """Vector entry point for `gym.make_vec(..., vectorization_mode='vector_entry_point')`.
 
-    Gymnasium will always pass `num_envs=...` for vector entry points, so we translate
-    that into `config.num_envs` and avoid forwarding `num_envs` to the env constructor.
+    Gymnasium passes `num_envs=...` for vector entry points; keep it as runtime
+    vectorization metadata instead of storing it in config.
     """
     cfg = deepcopy(config)
-
-    if cfg.num_envs != num_envs:
-        logger.warning(
-            f"make_vec got num_envs={num_envs} but config.num_envs={cfg.num_envs}; using num_envs"
-        )
-    cfg.num_envs = num_envs
 
     if max_episode_steps is not None:
         cfg.max_episode_steps = max_episode_steps
@@ -105,6 +99,7 @@ def make_vec(
     return make(
         env_id,
         config=cfg,
+        num_envs=num_envs,
         process_id=process_id,
         total_processes=total_processes,
         **kwargs,

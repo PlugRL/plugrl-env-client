@@ -17,7 +17,7 @@ UID = "Classic-v1"
 @register_env_config(UID)
 @dataclasses.dataclass
 class ClassicConfig(BaseEnvConfig):
-    classic_env_name: str = "CartPole-v1"
+    name: str = "CartPole-v1"
 
 
 @register_env(UID)
@@ -27,19 +27,21 @@ class ClassicEnv(BaseEnv):
     def __init__(
         self,
         config: ClassicConfig,
+        num_envs: int = 1,
         process_id: int | None = None,
         total_processes: int | None = None,
     ):
         super().__init__(
             config=config,
+            num_envs=num_envs,
             process_id=process_id,
             total_processes=total_processes,
         )
         if self.num_envs != 1:
             raise ValueError("ClassicEnv only supports num_envs=1")
-        env = gym.make(config.classic_env_name, render_mode="rgb_array")
+        env = gym.make(config.name, render_mode="rgb_array")
         self.env = env
-        self.game_name = config.classic_env_name
+        self.game_name = config.name
 
     def prepare_obs(self, obs: np.ndarray) -> Observation:
         frame = self.env.render()

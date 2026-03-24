@@ -1,13 +1,18 @@
 import sys
+import json
+from functools import partial
+from pathlib import Path
 from typing import cast
 
 import gymnasium as gym
 import numpy as np
 
-from plugrl_env_client.cli_rollout import rollout
-from plugrl_env_client.cli_args import Args
+from plugrl_env_client.recorder import Recorder, RecorderArgs
+from plugrl_env_client.runner.args import RunnerArgs
+from plugrl_env_client.runner.rollout import rollout
+from plugrl_env_client.runner.run import _make_env
 from plugrl_env_client.envs.base_env import Observation
-from plugrl_env_client.websocket_env_client_agent import WebSocketEnvClientAgent
+from plugrl_env_client.agent.websocket_env_client_agent import WebSocketEnvClientAgent
 
 
 class _FakeAgent:
@@ -89,44 +94,120 @@ class _FakeVecEnv:
         return obs, reward, terminated, truncated, info
 
 
-def test_cli_main_parses_and_calls_run(monkeypatch):
+def test_cli_main_parses_and_calls_run(monkeypatch, tmp_path):
     import plugrl_env_client.cli as cli
 
     called: dict[str, object] = {}
 
-    def fake_run(args):
+    def fake_run(args, agent_factory, **kwargs):
         called["args"] = args
+        called["agent_factory"] = agent_factory
+        called["kwargs"] = kwargs
 
     monkeypatch.setattr(cli, "run", fake_run)
-    monkeypatch.setattr(sys, "argv", ["prog", "dummy-v1", "--num-episodes", "2"])
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prog",
+            "dummy-v1",
+            "--num-episodes",
+            "2",
+            "--num-envs",
+            "3",
+            "--server-host",
+            "127.0.0.1",
+            "--server-port",
+            "9001",
+            "--reconnect-on-server-stop",
+        ],
+    )
 
     cli.main()
 
-    args = cast(Args, called["args"])
+    args = cast(RunnerArgs, called["args"])
     assert args.uid == "Dummy-v1"
-    assert args.num_episodes == 2
+    kwargs = cast(dict[str, object], called["kwargs"])
+    assert kwargs["num_episodes"] == 2
+    assert kwargs["num_envs"] == 3
+    assert kwargs["env_config"] is not None
+    assert isinstance(kwargs["exp_name"], str)
+    assert cast(Path, kwargs["output_dir"]).name == cast(str, kwargs["exp_name"])
+    config_path = cast(Path, kwargs["output_dir"]) / "client_config.json"
+    assert config_path.exists()
+    agent_factory = cast(partial, called["agent_factory"])
+    assert agent_factory.keywords["host"] == "127.0.0.1"
+    assert agent_factory.keywords["port"] == 9001
+    assert agent_factory.keywords["reconnect_on_server_stop"] is True
 
 
-def test_cli_main_num_procs_dispatches_to_multiprocess(monkeypatch):
+def test_cli_main_keeps_top_level_env_for_runtime(monkeypatch, tmp_path):
     import plugrl_env_client.cli as cli
 
     called: dict[str, object] = {}
 
-    def fake_run(_args):
+    def fake_run(args, _agent_factory, **kwargs):
+        called["args"] = args
+        called["kwargs"] = kwargs
+
+    monkeypatch.setattr(cli, "run", fake_run)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prog",
+            "d4rl-v1",
+            "--env.name",
+            "walker2d-medium-v2",
+            "--env.use-image",
+        ],
+    )
+
+    cli.main()
+
+    args = cast(RunnerArgs, called["args"])
+    assert args.uid == "D4RL-v1"
+    kwargs = cast(dict[str, object], called["kwargs"])
+    env_config = kwargs["env_config"]
+    assert env_config.name == "walker2d-medium-v2"
+    assert env_config.use_image is True
+
+
+def test_cli_main_num_procs_dispatches_to_multiprocess(monkeypatch, tmp_path):
+    import plugrl_env_client.cli as cli
+
+    called: dict[str, object] = {}
+
+    def fake_run(_args, _agent_factory, **kwargs):
         called["run"] = True
 
-    def fake_run_multiprocess(_args):
-        called["mp"] = _args.num_procs
+    def fake_run_multiprocess(_args, agent_factory, **kwargs):
+        called["mp"] = kwargs["num_procs"]
+        called["agent_factory"] = agent_factory
+        called["kwargs"] = kwargs
 
     monkeypatch.setattr(cli, "run", fake_run)
     monkeypatch.setattr(cli, "run_multiprocess", fake_run_multiprocess)
-    monkeypatch.setattr(sys, "argv", ["prog", "dummy-v1", "--num-procs", "2"])
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["prog", "dummy-v1", "--num-procs", "2", "--server-port", "8123"],
+    )
 
     cli.main()
 
     assert "mp" in called
     assert called["mp"] == 2
     assert "run" not in called
+    kwargs = cast(dict[str, object], called["kwargs"])
+    assert isinstance(kwargs["recorder_args"], RecorderArgs)
+    assert kwargs["num_procs"] == 2
+    agent_factory = cast(partial, called["agent_factory"])
+    assert agent_factory.keywords["host"] == "0.0.0.0"
+    assert agent_factory.keywords["port"] == 8123
 
 
 def test_rollout_infer_feedback_and_partial_reset_semantics():
@@ -208,3 +289,209 @@ def test_rollout_dynamic_plan_capacity_when_replan_steps_none():
 
     assert len(env.step_calls) == 1
     np.testing.assert_array_equal(env.step_calls[0][0], action_chunk[0, 0])
+
+
+def test_make_env_uses_vector_entry_point_kwargs(monkeypatch):
+    called: dict[str, object] = {}
+
+    def fake_make_vec(env_id, **kwargs):
+        called["env_id"] = env_id
+        called["kwargs"] = kwargs
+        return cast(gym.vector.VectorEnv, object())
+
+    monkeypatch.setattr(gym, "make_vec", fake_make_vec)
+
+    env_config = cast(object, type("Cfg", (), {})())
+    runner_args = RunnerArgs(uid="Dummy-v1")
+    runner_args.max_episode_steps = 17
+
+    _make_env(
+        runner_args,
+        env_config,
+        3,
+        process_id=2,
+        total_processes=4,
+        env_lock=None,
+    )
+
+    assert called["env_id"] == "Dummy-v1"
+    kwargs = cast(dict[str, object], called["kwargs"])
+    assert kwargs["num_envs"] == 3
+    assert kwargs["vectorization_mode"] == "vector_entry_point"
+    assert kwargs["config"] is env_config
+    assert kwargs["max_episode_steps"] == 17
+    assert kwargs["process_id"] == 2
+    assert kwargs["total_processes"] == 4
+    assert "vector_kwargs" not in kwargs
+
+
+def test_recorder_writes_fieldwise_obs_outputs(tmp_path):
+    recorder = Recorder(
+        RecorderArgs(
+            episode_freq=1,
+            record_obs_stats=True,
+            record_episode_metrics=True,
+            record_video=False,
+        ),
+        exp_name="exp",
+        output_dir=tmp_path,
+        num_envs=1,
+        process_id=None,
+        total_processes=None,
+    )
+
+    first_obs = Observation(
+        images={"img": np.zeros((1, 2, 2, 3), dtype=np.uint8)},
+        states={"state": np.ones((1, 3), dtype=np.float32)},
+        text=np.asarray(["hello"], dtype=np.str_),
+    )
+    last_obs = Observation(
+        images={"img": np.full((1, 2, 2, 3), 255, dtype=np.uint8)},
+        states={"state": np.full((1, 3), 2.0, dtype=np.float32)},
+        text=np.asarray(["done"], dtype=np.str_),
+    )
+
+    recorder.on_reset(first_obs, {}, reset_indices=None)
+    recorder.on_episode_done(
+        np.asarray([0], dtype=np.int64),
+        last_obs,
+        {
+            "episode": {
+                "r": np.asarray([3.5], dtype=np.float32),
+                "s": np.asarray([True]),
+            },
+            "bar": np.asarray([9], dtype=np.int32),
+        },
+    )
+    recorder.close()
+
+    sample_dir = (
+        tmp_path / "rollout" / "proc_000" / "sampled" / "ep_000001" / "env_000" / "obs"
+    )
+    assert (sample_dir / "first" / "images" / "img.png").exists()
+    assert (sample_dir / "last" / "images" / "img.png").exists()
+    assert (sample_dir / "first" / "states" / "state.npy").exists()
+    assert (sample_dir / "last" / "states" / "state.npy").exists()
+    assert (sample_dir / "first" / "text.txt").read_text(
+        encoding="utf-8"
+    ).strip() == "hello"
+    assert (sample_dir / "last" / "text.txt").read_text(
+        encoding="utf-8"
+    ).strip() == "done"
+    last_info = json.loads(
+        (sample_dir / "last" / "info.json").read_text(encoding="utf-8")
+    )
+    assert last_info["bar"] == 9
+    assert last_info["episode"]["r"] == 3.5
+    obs_stats_lines = (
+        (tmp_path / "rollout" / "proc_000" / "metrics" / "obs_stats.jsonl")
+        .read_text(encoding="utf-8")
+        .strip()
+        .splitlines()
+    )
+    obs_stats = json.loads(obs_stats_lines[-1])
+    assert obs_stats["last_info"]["bar"] == 9
+    assert (
+        tmp_path / "rollout" / "proc_000" / "metrics" / "episode_metrics.jsonl"
+    ).exists()
+    assert (tmp_path / "rollout" / "proc_000" / "metrics" / "obs_stats.jsonl").exists()
+
+
+def test_recorder_nonzero_process_writes_under_own_proc_dir(tmp_path):
+    recorder = Recorder(
+        RecorderArgs(
+            episode_freq=1,
+            thread0_only=False,
+            record_obs_stats=False,
+            record_episode_metrics=True,
+            record_video=False,
+        ),
+        exp_name="exp",
+        output_dir=tmp_path,
+        num_envs=1,
+        process_id=2,
+        total_processes=4,
+    )
+
+    first_obs = Observation(
+        images={"img": np.zeros((1, 2, 2, 3), dtype=np.uint8)},
+        states={"state": np.ones((1, 3), dtype=np.float32)},
+        text=np.asarray(["hello"], dtype=np.str_),
+    )
+
+    recorder.on_reset(first_obs, {}, reset_indices=None)
+    recorder.on_episode_done(
+        np.asarray([0], dtype=np.int64),
+        first_obs,
+        {
+            "episode": {
+                "r": np.asarray([1.0], dtype=np.float32),
+                "s": np.asarray([False]),
+            }
+        },
+    )
+    recorder.close()
+
+    proc_dir = tmp_path / "rollout" / "proc_002"
+    assert (proc_dir / "manifest.json").exists()
+    assert (proc_dir / "metrics" / "episode_metrics.jsonl").exists()
+
+
+def test_recorder_metric_window_uses_recent_episodes():
+    recorder = Recorder(
+        RecorderArgs(
+            episode_freq=1,
+            record_obs_stats=False,
+            record_episode_metrics=False,
+            record_video=False,
+            metric_window=2,
+        ),
+        exp_name="exp",
+        output_dir=Path("/tmp/recorder-metric-window"),
+        num_envs=1,
+        process_id=None,
+        total_processes=None,
+    )
+
+    obs = Observation(
+        images={"img": np.zeros((1, 2, 2, 3), dtype=np.uint8)},
+        states={"state": np.zeros((1, 1), dtype=np.float32)},
+        text=np.asarray(["x"], dtype=np.str_),
+    )
+
+    recorder.on_reset(obs, {}, reset_indices=None)
+    recorder.on_episode_done(
+        np.asarray([0], dtype=np.int64),
+        obs,
+        {
+            "episode": {
+                "r": np.asarray([1.0], dtype=np.float32),
+                "s": np.asarray([False]),
+            }
+        },
+    )
+    recorder.on_reset(obs, {}, reset_indices=np.asarray([0], dtype=np.int64))
+    recorder.on_episode_done(
+        np.asarray([0], dtype=np.int64),
+        obs,
+        {
+            "episode": {
+                "r": np.asarray([3.0], dtype=np.float32),
+                "s": np.asarray([True]),
+            }
+        },
+    )
+    recorder.on_reset(obs, {}, reset_indices=np.asarray([0], dtype=np.int64))
+    recorder.on_episode_done(
+        np.asarray([0], dtype=np.int64),
+        obs,
+        {
+            "episode": {
+                "r": np.asarray([5.0], dtype=np.float32),
+                "s": np.asarray([True]),
+            }
+        },
+    )
+
+    assert recorder._mean_return() == 4.0
+    assert recorder._mean_success_rate() == 1.0
