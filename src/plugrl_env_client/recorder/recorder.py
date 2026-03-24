@@ -5,20 +5,20 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-import imageio
 import numpy as np
 from loguru import logger
 
 from plugrl_env_client.envs.base_env import Observation
 from plugrl_env_client.recorder.args import RecorderArgs
-from plugrl_env_client.utils.recorder import (
-    append_jsonl,
-    ensure_rgb,
-    make_grid,
-    phase_stats,
-    to_builtin,
-    write_json,
+from plugrl_env_client.recorder.events import EpisodeSampleEvent, FullRolloutFrameEvent
+from plugrl_env_client.recorder.sink import AsyncRecorderSink
+from plugrl_env_client.recorder.writers import (
+    EpisodeMetricsWriter,
+    EpisodeVideoBuffer,
+    ObservationArtifactWriter,
+    VideoArtifactWriter,
 )
+from plugrl_env_client.utils.recorder import write_json
 from plugrl_env_client.utils.rollout import _select_obs
 
 
@@ -54,7 +54,6 @@ class Recorder:
                 )
 
         self.root_dir = self.output_dir / "rollout" / f"proc_{self.proc_index:03d}"
-
         self.metrics_dir = self.root_dir / "metrics"
         self.sampled_dir = self.root_dir / "sampled"
         self.full_videos_dir = self.root_dir / "videos" / "full" / "images"
@@ -71,13 +70,27 @@ class Recorder:
 
         self.current_episode_ids = np.zeros((self.num_envs,), dtype=np.int64)
         self.first_obs_by_env: list[Observation | None] = [None] * self.num_envs
-        self.env0_image_frames: dict[str, list[np.ndarray]] = {}
-        self.full_video_writers: dict[str, Any] = {}
+
+        self._obs_writer = ObservationArtifactWriter(obs_stats_path=self.obs_stats_path)
+        self._metrics_writer = EpisodeMetricsWriter(
+            episode_metrics_path=self.episode_metrics_path
+        )
+        self._video_buffer = EpisodeVideoBuffer()
+        self._video_writer = VideoArtifactWriter(
+            full_videos_dir=self.full_videos_dir,
+            video_fps=args.video_fps,
+        )
+        self._sink: AsyncRecorderSink | None = None
 
         if not self.should_write:
             return
 
         self.root_dir.mkdir(parents=True, exist_ok=True)
+        self._sink = AsyncRecorderSink(
+            name=f"recorder-writer-{self.proc_index}",
+            handler=self._handle_event,
+            on_close=self._video_writer.close,
+        )
         write_json(
             self.root_dir / "manifest.json",
             {
@@ -106,19 +119,21 @@ class Recorder:
             else np.asarray(reset_indices, dtype=np.int64)
         )
         for env_idx in indices.tolist():
-            self.first_obs_by_env[env_idx] = _select_obs(obs, [env_idx])
+            self.first_obs_by_env[env_idx] = self._clone_observation(
+                _select_obs(obs, [env_idx])
+            )
             self.current_episode_ids[env_idx] += 1
 
         if not self.should_write:
             return
 
         if reset_indices is None and int(0) < self.num_envs:
-            self._reset_env0_video(obs)
+            self._video_buffer.reset(obs)
         elif reset_indices is not None and np.any(indices == 0):
-            self._reset_env0_video(obs)
+            self._video_buffer.reset(obs)
 
         if self.full_rollout_video:
-            self._write_full_rollout_frame(obs)
+            self._submit(FullRolloutFrameEvent(obs=self._snapshot_images(obs)))
 
     def on_step(
         self,
@@ -132,9 +147,9 @@ class Recorder:
         if not self.should_write:
             return
         if self.args.record_video and not self.full_rollout_video and self.num_envs > 0:
-            self._append_env0_video_frame(next_obs)
+            self._video_buffer.append(next_obs)
         if self.full_rollout_video:
-            self._write_full_rollout_frame(next_obs)
+            self._submit(FullRolloutFrameEvent(obs=self._snapshot_images(next_obs)))
 
     def on_episode_done(
         self,
@@ -171,12 +186,11 @@ class Recorder:
                 )
 
     def close(self) -> None:
-        for writer in self.full_video_writers.values():
-            writer.close()
-        self.full_video_writers.clear()
-
         if not self.should_write:
             return
+
+        if self._sink is not None:
+            self._sink.close()
 
         write_json(
             self.summary_path,
@@ -202,6 +216,73 @@ class Recorder:
             return 0.0
         return float(np.mean(np.asarray(self.success_window, dtype=np.float32)))
 
+    def _record_sample(
+        self,
+        *,
+        env_idx: int,
+        done_obs: Observation,
+        done_info: dict[str, Any],
+        done_offset: int,
+        episode_return: float,
+        episode_success: bool,
+    ) -> None:
+        episode_id = int(self.current_episode_ids[env_idx])
+        sample_dir = (
+            self.sampled_dir
+            / f"ep_{self.completed_episodes:06d}"
+            / f"env_{env_idx:03d}"
+        )
+        first_obs = self.first_obs_by_env[env_idx]
+        if first_obs is None:
+            first_obs = done_obs
+
+        self._submit(
+            EpisodeSampleEvent(
+                sample_dir=sample_dir,
+                completed_episode=self.completed_episodes,
+                process_id=self.proc_index,
+                env_id=env_idx,
+                env_episode_id=episode_id,
+                episode_return=episode_return,
+                episode_success=episode_success,
+                mean_return=self._mean_return(),
+                mean_success_rate=self._mean_success_rate(),
+                first_obs=self._clone_observation(first_obs),
+                done_obs=self._clone_observation(done_obs),
+                last_info=self._clone_value(
+                    self._select_episode_info(
+                        done_info, env_idx=env_idx, done_offset=done_offset
+                    )
+                ),
+                env0_image_frames=self._video_buffer.snapshot()
+                if self.args.record_video
+                and not self.full_rollout_video
+                and env_idx == 0
+                else {},
+            )
+        )
+
+    def _handle_event(self, event: EpisodeSampleEvent | FullRolloutFrameEvent) -> None:
+        if isinstance(event, EpisodeSampleEvent):
+            if self.args.record_obs_stats:
+                self._obs_writer.write_sample(event)
+            if self.args.record_episode_metrics:
+                self._metrics_writer.write_sample(event)
+            if event.env0_image_frames:
+                self._video_writer.write_sample(event)
+            return
+
+        if isinstance(event, FullRolloutFrameEvent):
+            self._video_writer.write_full_rollout_frame(event)
+            return
+
+        raise TypeError(f"Unsupported recorder event type: {type(event)!r}")
+
+    def _submit(self, event: EpisodeSampleEvent | FullRolloutFrameEvent) -> None:
+        if self._sink is None:
+            raise RuntimeError("Recorder sink is not initialized")
+        self._sink.submit(event)
+
     def _extract_episode_info(
         self, info: dict[str, Any], expected_count: int
     ) -> dict[str, np.ndarray]:
@@ -222,98 +303,6 @@ class Recorder:
         if successes.shape[0] != expected_count:
             successes = np.resize(successes, (expected_count,))
         return {"r": returns, "s": successes}
-
-    def _record_sample(
-        self,
-        *,
-        env_idx: int,
-        done_obs: Observation,
-        done_info: dict[str, Any],
-        done_offset: int,
-        episode_return: float,
-        episode_success: bool,
-    ) -> None:
-        if not self.should_write:
-            return
-
-        episode_id = int(self.current_episode_ids[env_idx])
-        sample_dir = (
-            self.sampled_dir
-            / f"ep_{self.completed_episodes:06d}"
-            / f"env_{env_idx:03d}"
-        )
-        first_obs = self.first_obs_by_env[env_idx]
-        if first_obs is None:
-            first_obs = done_obs
-
-        if self.args.record_obs_stats:
-            first_dir = sample_dir / "obs" / "first"
-            last_dir = sample_dir / "obs" / "last"
-            self._write_observation_artifacts(first_dir, first_obs)
-            self._write_observation_artifacts(
-                last_dir,
-                done_obs,
-                info=self._select_episode_info(
-                    done_info, env_idx=env_idx, done_offset=done_offset
-                ),
-            )
-            append_jsonl(
-                self.obs_stats_path,
-                {
-                    "completed_episode": self.completed_episodes,
-                    "process_id": self.proc_index,
-                    "env_id": env_idx,
-                    "env_episode_id": episode_id,
-                    "first": phase_stats(first_obs),
-                    "last": phase_stats(done_obs),
-                    "last_info": self._select_episode_info(
-                        done_info, env_idx=env_idx, done_offset=done_offset
-                    ),
-                },
-            )
-
-        if self.args.record_episode_metrics:
-            append_jsonl(
-                self.episode_metrics_path,
-                {
-                    "completed_episode": self.completed_episodes,
-                    "process_id": self.proc_index,
-                    "env_id": env_idx,
-                    "env_episode_id": episode_id,
-                    "episode_return": episode_return,
-                    "episode_success": episode_success,
-                    "mean_return": self._mean_return(),
-                    "mean_success_rate": self._mean_success_rate(),
-                },
-            )
-
-        if self.args.record_video and not self.full_rollout_video and env_idx == 0:
-            self._write_env0_episode_videos(sample_dir / "images")
-
-    def _write_observation_artifacts(
-        self,
-        phase_dir: Path,
-        obs: Observation,
-        *,
-        info: dict[str, Any] | None = None,
-    ) -> None:
-        for key, value in obs.images.items():
-            image_path = phase_dir / "images" / f"{key}.png"
-            image_path.parent.mkdir(parents=True, exist_ok=True)
-            imageio.imwrite(image_path, ensure_rgb(value[0]))
-
-        for key, value in obs.states.items():
-            state_path = phase_dir / "states" / f"{key}.npy"
-            state_path.parent.mkdir(parents=True, exist_ok=True)
-            with state_path.open("wb") as f:
-                np.save(f, value[0], allow_pickle=False)
-
-        text_path = phase_dir / "text.txt"
-        text_path.parent.mkdir(parents=True, exist_ok=True)
-        text_path.write_text("\n".join(obs.text.tolist()), encoding="utf-8")
-
-        if info is not None:
-            write_json(phase_dir / "info.json", to_builtin(info))
 
     def _select_episode_info(
         self,
@@ -347,41 +336,39 @@ class Recorder:
 
         return {k: _slice(v) for k, v in info.items()}
 
-    def _reset_env0_video(self, obs: Observation) -> None:
-        self.env0_image_frames = {
-            key: [ensure_rgb(value[0]).copy()] for key, value in obs.images.items()
-        }
+    def _write_observation_artifacts(
+        self,
+        phase_dir: Path,
+        obs: Observation,
+        *,
+        info: dict[str, Any] | None = None,
+    ) -> None:
+        self._obs_writer.write_observation_artifacts(phase_dir, obs, info=info)
 
-    def _append_env0_video_frame(self, obs: Observation) -> None:
-        if not self.env0_image_frames:
-            self._reset_env0_video(obs)
-            return
-        for key, value in obs.images.items():
-            self.env0_image_frames.setdefault(key, []).append(
-                ensure_rgb(value[0]).copy()
-            )
+    def _clone_observation(self, obs: Observation) -> Observation:
+        return Observation(
+            images={key: value.copy() for key, value in obs.images.items()},
+            states={key: value.copy() for key, value in obs.states.items()},
+            text=np.array(obs.text, dtype=np.str_, copy=True),
+        )
 
-    def _write_env0_episode_videos(self, images_dir: Path) -> None:
-        for key, frames in self.env0_image_frames.items():
-            if not frames:
-                continue
-            path = images_dir / f"{key}.mp4"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            writer = imageio.get_writer(path, fps=8)
-            try:
-                for frame in frames:
-                    writer.append_data(frame)
-            finally:
-                writer.close()
+    def _snapshot_images(self, obs: Observation) -> Observation:
+        batch_size = 1
+        if obs.images:
+            batch_size = int(next(iter(obs.images.values())).shape[0])
+        return Observation(
+            images={key: value.copy() for key, value in obs.images.items()},
+            states={},
+            text=np.asarray([""] * batch_size, dtype=np.str_),
+        )
 
-    def _write_full_rollout_frame(self, obs: Observation) -> None:
-        for key, value in obs.images.items():
-            writer = self.full_video_writers.get(key)
-            if writer is None:
-                path = self.full_videos_dir / f"{key}.mp4"
-                path.parent.mkdir(parents=True, exist_ok=True)
-                writer = imageio.get_writer(path, fps=8)
-                self.full_video_writers[key] = writer
-            frames = np.asarray(value)
-            grid = make_grid(np.asarray([ensure_rgb(frame) for frame in frames]))
-            writer.append_data(grid)
+    def _clone_value(self, value: Any) -> Any:
+        if isinstance(value, np.ndarray):
+            return value.copy()
+        if isinstance(value, dict):
+            return {k: self._clone_value(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._clone_value(v) for v in value]
+        if isinstance(value, tuple):
+            return tuple(self._clone_value(v) for v in value)
+        return value

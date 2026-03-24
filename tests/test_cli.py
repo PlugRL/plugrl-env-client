@@ -1,5 +1,7 @@
 import sys
 import json
+import threading
+import time
 from functools import partial
 from pathlib import Path
 from typing import cast
@@ -8,6 +10,7 @@ import gymnasium as gym
 import numpy as np
 
 from plugrl_env_client.recorder import Recorder, RecorderArgs
+from plugrl_env_client.recorder.writers import VideoArtifactWriter
 from plugrl_env_client.runner.args import RunnerArgs
 from plugrl_env_client.runner.rollout import rollout
 from plugrl_env_client.runner.run import _make_env
@@ -140,6 +143,39 @@ def test_cli_main_parses_and_calls_run(monkeypatch, tmp_path):
     assert agent_factory.keywords["host"] == "127.0.0.1"
     assert agent_factory.keywords["port"] == 9001
     assert agent_factory.keywords["reconnect_on_server_stop"] is True
+
+
+def test_cli_main_passes_recorder_video_fps(monkeypatch, tmp_path):
+    import plugrl_env_client.cli as cli
+
+    called: dict[str, object] = {}
+
+    def fake_run(_args, _agent_factory, **kwargs):
+        called["kwargs"] = kwargs
+
+    monkeypatch.setattr(cli, "run", fake_run)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prog",
+            "dummy-v1",
+            "--recorder.record-video",
+            "--recorder.video-fps",
+            "12",
+        ],
+    )
+
+    cli.main()
+
+    kwargs = cast(dict[str, object], called["kwargs"])
+    recorder_args = cast(RecorderArgs, kwargs["recorder_args"])
+    assert recorder_args.record_video is True
+    assert recorder_args.video_fps == 12.0
+    config_path = cast(Path, kwargs["output_dir"]) / "client_config.json"
+    config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    assert config_payload["recorder"]["video_fps"] == 12.0
 
 
 def test_cli_main_keeps_top_level_env_for_runtime(monkeypatch, tmp_path):
@@ -437,6 +473,69 @@ def test_recorder_nonzero_process_writes_under_own_proc_dir(tmp_path):
     assert (proc_dir / "metrics" / "episode_metrics.jsonl").exists()
 
 
+def test_recorder_saves_samples_asynchronously(monkeypatch, tmp_path):
+    recorder = Recorder(
+        RecorderArgs(
+            episode_freq=1,
+            record_obs_stats=True,
+            record_episode_metrics=False,
+            record_video=False,
+        ),
+        exp_name="exp",
+        output_dir=tmp_path,
+        num_envs=1,
+        process_id=None,
+        total_processes=None,
+    )
+
+    block_write = threading.Event()
+    write_started = threading.Event()
+    original_write = recorder._obs_writer.write_observation_artifacts
+
+    def slow_write(*args, **kwargs):
+        write_started.set()
+        if not block_write.wait(timeout=1.0):
+            raise TimeoutError("timed out waiting for async recorder write")
+        return original_write(*args, **kwargs)
+
+    monkeypatch.setattr(
+        recorder._obs_writer,
+        "write_observation_artifacts",
+        slow_write,
+    )
+
+    obs = Observation(
+        images={"img": np.zeros((1, 2, 2, 3), dtype=np.uint8)},
+        states={"state": np.ones((1, 3), dtype=np.float32)},
+        text=np.asarray(["hello"], dtype=np.str_),
+    )
+
+    recorder.on_reset(obs, {}, reset_indices=None)
+
+    start = time.perf_counter()
+    recorder.on_episode_done(
+        np.asarray([0], dtype=np.int64),
+        obs,
+        {
+            "episode": {
+                "r": np.asarray([1.0], dtype=np.float32),
+                "s": np.asarray([True]),
+            }
+        },
+    )
+    elapsed = time.perf_counter() - start
+
+    assert write_started.wait(timeout=0.5)
+    assert elapsed < 0.1
+
+    block_write.set()
+    recorder.close()
+
+    assert (
+        tmp_path / "rollout" / "proc_000" / "sampled" / "ep_000001" / "env_000" / "obs"
+    ).exists()
+
+
 def test_recorder_metric_window_uses_recent_episodes():
     recorder = Recorder(
         RecorderArgs(
@@ -495,3 +594,29 @@ def test_recorder_metric_window_uses_recent_episodes():
 
     assert recorder._mean_return() == 4.0
     assert recorder._mean_success_rate() == 1.0
+
+
+def test_video_artifact_writer_uses_configured_fps(monkeypatch, tmp_path):
+    calls: list[tuple[Path, float]] = []
+
+    class _FakeWriter:
+        def append_data(self, _frame):
+            return None
+
+        def close(self):
+            return None
+
+    def fake_get_writer(path, *, fps):
+        calls.append((Path(path), float(fps)))
+        return _FakeWriter()
+
+    monkeypatch.setattr(
+        "plugrl_env_client.recorder.writers.imageio.get_writer", fake_get_writer
+    )
+    writer = VideoArtifactWriter(full_videos_dir=tmp_path / "full", video_fps=12)
+    writer.write_episode_videos(
+        images_dir=tmp_path / "sampled" / "images",
+        image_frames={"cam": [np.zeros((2, 2, 3), dtype=np.uint8)]},
+    )
+
+    assert calls == [(tmp_path / "sampled" / "images" / "cam.mp4", 12.0)]

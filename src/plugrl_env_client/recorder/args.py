@@ -11,6 +11,8 @@ class RecorderArgs:
     thread0_only: bool = True
     # Save per-field video artifacts when a sampled episode is recorded.
     record_video: bool = False
+    # Output fps for recorded mp4 artifacts.
+    video_fps: float = 30.0
     # When enabled with episode_freq=1, record the whole rollout as videos.
     record_full_rollout: bool = False
     # Save first/last observation stats and raw per-field obs artifacts.
