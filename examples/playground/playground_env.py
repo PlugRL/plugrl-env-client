@@ -10,6 +10,26 @@ from typing import Any
 os.environ.setdefault("MUJOCO_GL", "egl")
 
 
+def _env_flag_enabled(flag: str, default: bool) -> bool:
+    argv = sys.argv[1:]
+    truthy = {"1", "true", "yes", "on"}
+    falsy = {"0", "false", "no", "off"}
+    for i, arg in enumerate(argv):
+        if arg == flag and i + 1 < len(argv):
+            value = argv[i + 1].strip().lower()
+            if value in truthy:
+                return True
+            if value in falsy:
+                return False
+        if arg.startswith(flag + "="):
+            value = arg.split("=", 1)[1].strip().lower()
+            if value in truthy:
+                return True
+            if value in falsy:
+                return False
+    return default
+
+
 def _configure_jax_cuda_toolchain() -> None:
     if sys.platform != "linux":
         return
@@ -50,6 +70,9 @@ def _configure_jax_cuda_toolchain() -> None:
 
 
 _configure_jax_cuda_toolchain()
+
+if not _env_flag_enabled("--env.preallocate-gpu-memory", default=False):
+    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
 import jax
 import numpy as np
@@ -98,9 +121,10 @@ class PlaygroundConfig(BaseEnvConfig):
     height: int = 240
     camera: str | None = None
     render_images: bool = False
+    preallocate_gpu_memory: bool = False
 
 
-@register_env(UID)
+@register_env(UID, max_episode_steps=1000)
 class PlaygroundEnv(BaseEnv):
     def __init__(
         self,

@@ -7,7 +7,7 @@ import numpy as np
 
 
 class VectorEpisodeStatsWrapper:
-    """Adds `info['episode']` stats (r, l, s) for VectorEnv-like envs.
+    """Adds `info['episode']` stats (r, l, s, mask) for VectorEnv-like envs.
 
     This wrapper is intentionally lightweight and only relies on the wrapped env
     exposing `num_envs`, `reset(...) -> (obs, info)` and
@@ -98,12 +98,18 @@ class VectorEpisodeStatsWrapper:
 
         if np.any(done):
             done_indices = np.nonzero(done)[0]
-            # Record per-episode stats for done envs.
-            ep_r = self._episode_returns[done_indices].astype(np.float32, copy=True)
-            ep_l = self._episode_lengths[done_indices].astype(np.int32, copy=True)
-            ep_s = self._episode_has_succeeded[done_indices].astype(np.bool_, copy=True)
+            # Keep episode stats full-length so downstream env slicing can stay
+            # aligned with per-env feedback indices.
+            ep_r = np.zeros_like(self._episode_returns, dtype=np.float32)
+            ep_l = np.zeros_like(self._episode_lengths, dtype=np.int32)
+            ep_s = np.zeros_like(self._episode_has_succeeded, dtype=np.bool_)
+            ep_mask = np.zeros_like(self._episode_has_succeeded, dtype=np.bool_)
+            ep_r[done_indices] = self._episode_returns[done_indices]
+            ep_l[done_indices] = self._episode_lengths[done_indices]
+            ep_s[done_indices] = self._episode_has_succeeded[done_indices]
+            ep_mask[done_indices] = True
 
-            for s in ep_s.tolist():
+            for s in self._episode_has_succeeded[done_indices].tolist():
                 self._success_queue.append(bool(s))
             mean_success_rate = (
                 float(np.mean(self._success_queue)) if self._success_queue else 0.0
@@ -113,15 +119,10 @@ class VectorEpisodeStatsWrapper:
                 info_episode = info.setdefault("episode", {})
                 info_episode.update(
                     {
-                        "r": ep_r
-                        if self._episode_returns.shape[0] > 1
-                        else float(ep_r[0]),
-                        "l": ep_l
-                        if self._episode_returns.shape[0] > 1
-                        else int(ep_l[0]),
-                        "s": ep_s
-                        if self._episode_returns.shape[0] > 1
-                        else bool(ep_s[0]),
+                        "r": ep_r,
+                        "l": ep_l,
+                        "s": ep_s,
+                        "mask": ep_mask,
                         "mean_success_rate": mean_success_rate,
                     }
                 )

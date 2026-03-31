@@ -44,6 +44,7 @@ examples/playground/.venv/bin/python examples/playground/playground_env.py playg
 ```
 
 `--num-envs` maps to MuJoCo Playground's batched JAX environment execution.
+This example also defaults `max_episode_steps=1000` to match the time-limit truncation behavior used by `playground_torch`.
 You can also combine it with `--num-procs` if you want multiple worker
 processes, each with its own batched env shard.
 
@@ -51,6 +52,18 @@ To disable RGB rendering and only send state/text observations, add:
 
 ```bash
   --env.render-images false
+```
+
+To avoid JAX preallocating most GPU memory at startup, this example defaults:
+
+```bash
+  --env.preallocate-gpu-memory false
+```
+
+If you explicitly want JAX's default preallocation behavior back, set:
+
+```bash
+  --env.preallocate-gpu-memory true
 ```
 
 
@@ -79,6 +92,8 @@ The following dimensions were inspected from MuJoCo Playground default configs.
   before launch.
 - On Linux, the example also prepends the wheel-shipped CUDA `ptxas` to `PATH`
   and sets `XLA_FLAGS=--xla_gpu_cuda_data_dir=...` before importing JAX.
+- By default this example sets `XLA_PYTHON_CLIENT_PREALLOCATE=false`. Use
+  `--env.preallocate-gpu-memory true` to re-enable JAX GPU preallocation.
 - On Linux GPU machines, if JAX falls back to CPU, check
   `JAX_DEFAULT_MATMUL_PRECISION=highest` and your CUDA/JAX installation.
 - The example exposes the MuJoCo Playground state tensors as `states/*` and
