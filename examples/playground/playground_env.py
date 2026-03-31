@@ -53,6 +53,7 @@ _configure_jax_cuda_toolchain()
 
 import jax
 import numpy as np
+import gymnasium as gym
 
 from mujoco_playground import registry
 
@@ -96,6 +97,7 @@ class PlaygroundConfig(BaseEnvConfig):
     width: int = 320
     height: int = 240
     camera: str | None = None
+    render_images: bool = False
 
 
 @register_env(UID)
@@ -120,6 +122,13 @@ class PlaygroundEnv(BaseEnv):
         self.state = None
         self.task_name = config.name
         self.action_dim = int(self.env.action_size)
+        self.single_action_space = gym.spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(self.action_dim,),
+            dtype=np.float32,
+        )
+        self.action_space = self.single_action_space
         self._reset_fn = jax.jit(jax.vmap(self.env.reset))
         self._step_fn = jax.jit(jax.vmap(self.env.step))
 
@@ -154,9 +163,9 @@ class PlaygroundEnv(BaseEnv):
             key.replace("/", "_"): value
             for key, value in _flatten_obs(self.state.obs).items()
         }
-        frame = self._render_frames()
+        images = dict(env=self._render_frames()) if self.config.render_images else {}
         return Observation(
-            images={"env": frame},
+            images=images,
             states=state_tensors,
             text=self.task_name,
         )

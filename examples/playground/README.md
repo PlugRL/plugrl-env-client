@@ -47,6 +47,31 @@ examples/playground/.venv/bin/python examples/playground/playground_env.py playg
 You can also combine it with `--num-procs` if you want multiple worker
 processes, each with its own batched env shard.
 
+To disable RGB rendering and only send state/text observations, add:
+
+```bash
+  --env.render-images false
+```
+
+
+## Common task dimensions
+
+The following dimensions were inspected from MuJoCo Playground default configs.
+`obs_dim` is the flattened size of `state.obs`, and `action_dim` is `env.action_size`.
+
+| env.name | obs_dim | action_dim |
+| --- | ---: | ---: |
+| BallInCup | 8 | 2 |
+| CartpoleBalance | 5 | 1 |
+| CheetahRun | 17 | 6 |
+| FingerSpin | 9 | 2 |
+| FingerTurnEasy | 12 | 2 |
+| FingerTurnHard | 12 | 2 |
+| FishSwim | 24 | 5 |
+| PointMass | 4 | 2 |
+| ReacherEasy | 6 | 2 |
+| ReacherHard | 6 | 2 |
+
 ## Notes
 
 - On first load, MuJoCo Playground may download Menagerie assets for some tasks.
