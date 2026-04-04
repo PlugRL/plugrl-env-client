@@ -48,6 +48,44 @@ The easiest way to get started is by cloning the repository and using `uv` to ma
     pip install -e ".[robomimic, atari, classic]"
     ```
 
+### Manual RoboCasa Setup
+
+`Robocasa-v1` is intentionally documented as a manual install instead of a built-in extra because RoboCasa requires a specific editable-install flow, external assets, and local setup scripts.
+
+Follow the upstream RoboCasa instructions in [`/mnt/robocasa/README.md`](/mnt/robocasa/README.md). The validated plan for `plugrl-env-client` is:
+
+1. Use Python `3.11`.
+2. Install `plugrl-env-client` itself in that environment.
+3. Clone and editable-install `robosuite` from the upstream `master` branch:
+
+   ```bash
+   git clone https://github.com/ARISE-Initiative/robosuite
+   cd robosuite
+   pip install -e .
+   ```
+
+4. Editable-install RoboCasa:
+
+   ```bash
+   git clone https://github.com/robocasa/robocasa
+   cd robocasa
+   pip install -e .
+   ```
+
+5. Run RoboCasa setup scripts:
+
+   ```bash
+   python -m robocasa.scripts.setup_macros
+   python -m robocasa.scripts.download_kitchen_assets
+   ```
+
+Notes:
+
+- RoboCasa's README explicitly recommends Python `3.11`.
+- RoboCasa's gym environments are registered through `robocasa.wrappers.gym_wrapper`, so a plain source checkout without proper editable install is not enough.
+- Asset download is required before real environment rollouts.
+- I did not run these installation steps automatically here; this section is the handoff plan for your manual setup.
+
 ## 🚀 Usage
 
 The `plugrl-run-env-client` tool launches one or more env client processes for specific environments.
@@ -98,6 +136,7 @@ The worker will then attempt to establish a WebSocket connection with the viewer
 | **dummy-v1** | Dummy/testing environment |
 | **classic-v1** | Classic control environments (e.g., CartPole) |
 | **robomimic-v1** | RoboMimic-based robotic manipulation environment |
+| **robocasa-v1** | RoboCasa kitchen manipulation environment with 3-view RGB + state + prompt |
 | **atari-v1** | Atari game environment |
 
 ### Examples
@@ -118,4 +157,59 @@ To see all available options for a specific environment:
 
 ```bash
 uv run plugrl-run-env-client dummy-v1 --help
+```
+
+### RoboCasa Examples
+
+After you have manually completed the RoboCasa installation steps above, you can inspect the RoboCasa-specific CLI options with:
+
+```bash
+uv run plugrl-run-env-client robocasa-v1 --help
+```
+
+A typical rollout command against a plugrl-compatible policy server looks like:
+
+```bash
+uv run plugrl-run-env-client robocasa-v1 \
+  --num-envs 8 \
+  --num-episodes 8 \
+  --env.task-name SearingMeat \
+  --env.split target \
+  --env.action-encoding passthrough \
+  --recorder.record-video \
+  --recorder.record-full-rollout \
+  --recorder.record-debug-packets \
+  --recorder.episode-freq 1
+```
+
+This setup records:
+
+- three per-view full-rollout mp4 files under `runs/.../rollout/proc_000/videos/full/images/`
+- first infer / infer-response / feedback debug packets under `runs/.../rollout/proc_000/debug_packets/`
+- sampled observation artifacts when `episode-freq` is enabled
+
+### Manual RoboCasa Tests
+
+The repository now includes manual RoboCasa pytest cases under [`tests/test_robocasa_manual.py`](/mnt/plugrl/plugrl-env-client/tests/test_robocasa_manual.py). They are intentionally not part of the default automated suite.
+
+After you finish the manual RoboCasa installation, you can run:
+
+```bash
+pytest -m manual tests/test_robocasa_manual.py::test_manual_robocasa_parallel_rollout_smoke -s
+```
+
+To validate real OpenPI server interoperability, first export:
+
+```bash
+export OPENPI_ROBOCASA_CONFIG_NAME=...
+export OPENPI_ROBOCASA_CHECKPOINT_DIR=...
+export OPENPI_ROBOCASA_DATASET_DIR=...
+# optional override, defaults to /mnt/openpi-base/.venv/bin/python
+export OPENPI_ROBOCASA_SERVER_PYTHON=...
+```
+
+Then run:
+
+```bash
+pytest -m manual tests/test_robocasa_manual.py::test_manual_robocasa_openpi_server_roundtrip -s
 ```

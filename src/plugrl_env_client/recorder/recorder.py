@@ -10,9 +10,14 @@ from loguru import logger
 
 from plugrl_env_client.envs.base_env import Observation
 from plugrl_env_client.recorder.args import RecorderArgs
-from plugrl_env_client.recorder.events import EpisodeSampleEvent, FullRolloutFrameEvent
+from plugrl_env_client.recorder.events import (
+    DebugPacketEvent,
+    EpisodeSampleEvent,
+    FullRolloutFrameEvent,
+)
 from plugrl_env_client.recorder.sink import AsyncRecorderSink
 from plugrl_env_client.recorder.writers import (
+    DebugPacketWriter,
     EpisodeMetricsWriter,
     EpisodeVideoBuffer,
     ObservationArtifactWriter,
@@ -43,6 +48,7 @@ class Recorder:
         self.should_write = (not args.thread0_only) or self.proc_index == 0
         self.enabled = self.should_write and int(args.episode_freq) > 0
         self.effective_episode_freq = int(args.episode_freq)
+        self.debug_packets_enabled = self.should_write and args.record_debug_packets
 
         self.full_rollout_video = False
         if self.enabled and args.record_video and args.record_full_rollout:
@@ -57,6 +63,7 @@ class Recorder:
         self.metrics_dir = self.root_dir / "metrics"
         self.sampled_dir = self.root_dir / "sampled"
         self.full_videos_dir = self.root_dir / "videos" / "full" / "images"
+        self.debug_packets_dir = self.root_dir / "debug_packets"
 
         self.episode_metrics_path = self.metrics_dir / "episode_metrics.jsonl"
         self.obs_stats_path = self.metrics_dir / "obs_stats.jsonl"
@@ -80,7 +87,9 @@ class Recorder:
             full_videos_dir=self.full_videos_dir,
             video_fps=args.video_fps,
         )
+        self._debug_writer = DebugPacketWriter()
         self._sink: AsyncRecorderSink | None = None
+        self._written_debug_packets: set[str] = set()
 
         if not self.should_write:
             return
@@ -185,6 +194,18 @@ class Recorder:
                     episode_success=episode_success,
                 )
 
+    def on_debug_packet(self, name: str, payload: dict[str, Any]) -> None:
+        if not self.debug_packets_enabled or name in self._written_debug_packets:
+            return
+        self._written_debug_packets.add(name)
+        self._submit(
+            DebugPacketEvent(
+                packet_dir=self.debug_packets_dir,
+                name=name,
+                payload=self._clone_value(payload),
+            )
+        )
+
     def close(self) -> None:
         if not self.should_write:
             return
@@ -262,7 +283,9 @@ class Recorder:
             )
         )
 
-    def _handle_event(self, event: EpisodeSampleEvent | FullRolloutFrameEvent) -> None:
+    def _handle_event(
+        self, event: EpisodeSampleEvent | FullRolloutFrameEvent | DebugPacketEvent
+    ) -> None:
         if isinstance(event, EpisodeSampleEvent):
             if self.args.record_obs_stats:
                 self._obs_writer.write_sample(event)
@@ -276,9 +299,15 @@ class Recorder:
             self._video_writer.write_full_rollout_frame(event)
             return
 
+        if isinstance(event, DebugPacketEvent):
+            self._debug_writer.write_packet(event)
+            return
+
         raise TypeError(f"Unsupported recorder event type: {type(event)!r}")
 
-    def _submit(self, event: EpisodeSampleEvent | FullRolloutFrameEvent) -> None:
+    def _submit(
+        self, event: EpisodeSampleEvent | FullRolloutFrameEvent | DebugPacketEvent
+    ) -> None:
         if self._sink is None:
             raise RuntimeError("Recorder sink is not initialized")
         self._sink.submit(event)

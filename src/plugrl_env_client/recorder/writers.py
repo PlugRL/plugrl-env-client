@@ -5,14 +5,20 @@ from typing import Any
 
 import imageio
 import numpy as np
+from plugrl_protocol import msgpack_numpy
 
 from plugrl_env_client.envs.base_env import Observation
-from plugrl_env_client.recorder.events import EpisodeSampleEvent, FullRolloutFrameEvent
+from plugrl_env_client.recorder.events import (
+    DebugPacketEvent,
+    EpisodeSampleEvent,
+    FullRolloutFrameEvent,
+)
 from plugrl_env_client.utils.recorder import (
     append_jsonl,
     ensure_rgb,
     make_grid,
     phase_stats,
+    summarize_value,
     to_builtin,
     write_json,
 )
@@ -157,3 +163,11 @@ class VideoArtifactWriter:
         for writer in self._full_video_writers.values():
             writer.close()
         self._full_video_writers.clear()
+
+
+class DebugPacketWriter:
+    def write_packet(self, event: DebugPacketEvent) -> None:
+        packet_dir = event.packet_dir / event.name
+        packet_dir.mkdir(parents=True, exist_ok=True)
+        write_json(packet_dir / "summary.json", {"payload": summarize_value(event.payload)})
+        (packet_dir / "raw.msgpack").write_bytes(msgpack_numpy.packb(event.payload))

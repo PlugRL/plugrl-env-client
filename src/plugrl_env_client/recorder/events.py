@@ -29,3 +29,10 @@ class EpisodeSampleEvent:
 @dataclass(slots=True)
 class FullRolloutFrameEvent:
     obs: Observation
+
+
+@dataclass(slots=True)
+class DebugPacketEvent:
+    packet_dir: Path
+    name: str
+    payload: dict[str, Any]

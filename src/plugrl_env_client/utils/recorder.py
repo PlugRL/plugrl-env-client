@@ -100,3 +100,32 @@ def phase_stats(obs: Observation) -> dict[str, Any]:
         "states": {key: stats_for_array(value[0]) for key, value in obs.states.items()},
         "text": stats_for_text(obs.text),
     }
+
+
+def summarize_value(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        if np.issubdtype(value.dtype, np.str_) or np.issubdtype(value.dtype, np.bytes_):
+            return stats_for_text(value)
+        summary = stats_for_array(value)
+        if value.size <= 32 and value.ndim <= 2:
+            summary["value"] = to_builtin(value)
+        return summary
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(k): summarize_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        if len(value) <= 8:
+            return [summarize_value(v) for v in value]
+        return {
+            "type": "list",
+            "length": len(value),
+            "head": [summarize_value(v) for v in value[:8]],
+        }
+    if isinstance(value, tuple):
+        return {
+            "type": "tuple",
+            "length": len(value),
+            "items": [summarize_value(v) for v in value[:8]],
+        }
+    return value

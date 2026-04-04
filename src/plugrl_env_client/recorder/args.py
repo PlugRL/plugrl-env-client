@@ -21,3 +21,7 @@ class RecorderArgs:
     record_episode_metrics: bool = True
     # Window size for moving-average return and success metrics.
     metric_window: int = 100
+    # Save the first infer / infer-response / feedback packets for debugging.
+    record_debug_packets: bool = False
+    # Maximum number of envs preserved in each debug packet snapshot.
+    debug_packet_env_limit: int = 8

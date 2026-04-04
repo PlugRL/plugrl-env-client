@@ -68,6 +68,7 @@ plugrl_env_client = ["**/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["manual: requires local RoboCasa / OpenPI assets and should be run explicitly."]
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

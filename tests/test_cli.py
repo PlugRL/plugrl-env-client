@@ -620,3 +620,50 @@ def test_video_artifact_writer_uses_configured_fps(monkeypatch, tmp_path):
     )
 
     assert calls == [(tmp_path / "sampled" / "images" / "cam.mp4", 12.0)]
+
+
+def test_rollout_records_debug_packets(tmp_path):
+    num_envs = 2
+    action_dim = 3
+    action_chunk = np.zeros((1, num_envs, action_dim), dtype=np.float32)
+
+    env = _FakeVecEnv(
+        num_envs=num_envs,
+        action_dim=action_dim,
+        terminated_mask=np.asarray([True, False], dtype=np.bool_),
+    )
+    agent = _FakeAgent(action_chunk)
+    recorder = Recorder(
+        RecorderArgs(
+            episode_freq=0,
+            record_video=False,
+            record_debug_packets=True,
+            debug_packet_env_limit=2,
+        ),
+        exp_name="exp",
+        output_dir=tmp_path,
+        num_envs=num_envs,
+        process_id=None,
+        total_processes=None,
+    )
+
+    rollout(
+        cast(gym.vector.VectorEnv, env),
+        cast(WebSocketEnvClientAgent, agent),
+        num_episodes=1,
+        replan_steps=1,
+        num_envs=num_envs,
+        recorder=recorder,
+    )
+    recorder.close()
+
+    debug_dir = tmp_path / "rollout" / "proc_000" / "debug_packets"
+    assert (debug_dir / "infer_request" / "raw.msgpack").exists()
+    assert (debug_dir / "infer_response" / "raw.msgpack").exists()
+    assert (debug_dir / "feedback" / "raw.msgpack").exists()
+
+    infer_summary = json.loads(
+        (debug_dir / "infer_request" / "summary.json").read_text(encoding="utf-8")
+    )
+    assert "env_indices" in infer_summary["payload"]
+    assert "data" in infer_summary["payload"]

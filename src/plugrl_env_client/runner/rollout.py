@@ -49,6 +49,12 @@ def rollout(
     total_env_steps = 0
     last_timing_log_at = time.perf_counter()
 
+    def debug_slice(indices: np.ndarray) -> np.ndarray:
+        if recorder is None or not recorder.debug_packets_enabled:
+            return np.asarray([], dtype=np.int64)
+        limit = max(0, int(recorder.args.debug_packet_env_limit))
+        return np.asarray(indices[:limit], dtype=np.int64)
+
     def log_timing_summary(final: bool = False) -> None:
         total_collect_time = (
             infer_wait_total + infer_obs_pack_total + env_step_total + feedback_total
@@ -75,6 +81,16 @@ def rollout(
             infer_obs_pack_started_at = time.perf_counter()
             obs_msg = dataclasses.asdict(_select_obs(obs, need_infer))
             infer_obs_pack_total += time.perf_counter() - infer_obs_pack_started_at
+            debug_infer_indices = debug_slice(need_infer)
+            if debug_infer_indices.size and recorder is not None:
+                recorder.on_debug_packet(
+                    "infer_request",
+                    {
+                        "env_indices": debug_infer_indices,
+                        "step_ids": step_id[debug_infer_indices],
+                        "data": dataclasses.asdict(_select_obs(obs, debug_infer_indices)),
+                    },
+                )
 
             infer_wait_started_at = time.perf_counter()
             action_chunk = agent.infer(
@@ -84,14 +100,28 @@ def rollout(
             )["action"]
             infer_wait_total += time.perf_counter() - infer_wait_started_at
             infer_call_count += 1
+            action_chunk_arr = np.asarray(action_chunk)
 
-            steps = replan_steps or len(action_chunk)
-            if len(action_chunk) < steps:
-                raise ValueError(
-                    f"replan_steps={replan_steps} exceeds predicted steps={len(action_chunk)}"
+            if debug_infer_indices.size and recorder is not None:
+                debug_count = int(debug_infer_indices.size)
+                recorder.on_debug_packet(
+                    "infer_response",
+                    {
+                        "env_indices": debug_infer_indices,
+                        "step_ids": step_id[debug_infer_indices],
+                        "data": {
+                            "action": np.asarray(action_chunk_arr[:, :debug_count, ...])
+                        },
+                    },
                 )
 
-            a = np.asarray(action_chunk[:steps], dtype=expected_action_dtype)
+            steps = replan_steps or len(action_chunk_arr)
+            if len(action_chunk_arr) < steps:
+                raise ValueError(
+                    f"replan_steps={replan_steps} exceeds predicted steps={len(action_chunk_arr)}"
+                )
+
+            a = np.asarray(action_chunk_arr[:steps], dtype=expected_action_dtype)
             if a.shape[:2] != (steps, need_infer.size):
                 raise ValueError(
                     f"Expected action shape ({steps}, {need_infer.size}, da), got {a.shape}"
@@ -151,6 +181,27 @@ def rollout(
             feedback_info_pack_total += (
                 time.perf_counter() - feedback_info_pack_started_at
             )
+            debug_feedback_indices = debug_slice(feedback_indices)
+            if debug_feedback_indices.size and recorder is not None:
+                debug_feedback_info = _select_info(
+                    info, debug_feedback_indices, num_envs=num_envs
+                )
+                recorder.on_debug_packet(
+                    "feedback",
+                    {
+                        "env_indices": debug_feedback_indices,
+                        "step_ids": step_id[debug_feedback_indices],
+                        "data": {
+                            "obs": dataclasses.asdict(
+                                _select_obs(obs, debug_feedback_indices)
+                            ),
+                            "rewards": chunk_reward[debug_feedback_indices],
+                            "terminated": terminated[debug_feedback_indices],
+                            "truncated": truncated[debug_feedback_indices],
+                            "info": debug_feedback_info,
+                        },
+                    },
+                )
             agent.feedback(
                 obs=feedback_obs,
                 rewards=chunk_reward[feedback_indices],
