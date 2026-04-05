@@ -4,6 +4,7 @@ import json
 import multiprocessing as mp
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 import tyro
@@ -72,6 +73,30 @@ def _save_client_config(args: Args, *, output_dir: Path) -> None:
     )
 
 
+def _run_single_process_entry(
+    args: RunnerArgs,
+    agent_factory,
+    env_config: BaseEnvConfig,
+    num_envs: int,
+    num_episodes: int,
+    exp_name: str,
+    output_dir: Path,
+    recorder_args: RecorderArgs,
+) -> None:
+    run(
+        args,
+        agent_factory,
+        env_config=env_config,
+        num_envs=num_envs,
+        num_episodes=num_episodes,
+        exp_name=exp_name,
+        output_dir=output_dir,
+        recorder_args=recorder_args,
+        process_id=0,
+        total_processes=1,
+    )
+
+
 def main() -> None:
     args = cli()
     args.runner.uid = args.uid
@@ -103,16 +128,30 @@ def main() -> None:
             recorder_args=args.recorder,
         )
     else:
-        run(
-            args.runner,
-            agent_factory,
-            env_config=args.env,
-            num_envs=args.num_envs,
-            num_episodes=args.num_episodes,
-            exp_name=args.exp_name,
-            output_dir=output_dir,
-            recorder_args=args.recorder,
+        ctx = mp.get_context(args.runner.start_method)
+        p = cast(
+            mp.Process,
+            ctx.Process(
+                target=_run_single_process_entry,
+                args=(
+                    args.runner,
+                    agent_factory,
+                    args.env,
+                    args.num_envs,
+                    args.num_episodes,
+                    args.exp_name,
+                    output_dir,
+                    args.recorder,
+                ),
+                daemon=False,
+            ),
         )
+        p.start()
+        p.join()
+        if p.exitcode not in (0, None):
+            raise RuntimeError(
+                f"Env client process exited abnormally: pid={p.pid}, exitcode={p.exitcode}"
+            )
 
 
 if __name__ == "__main__":

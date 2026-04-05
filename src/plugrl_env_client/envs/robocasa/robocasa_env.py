@@ -139,6 +139,15 @@ def _collate_infos(info_by_env: list[dict[str, Any]]) -> dict[str, Any]:
     return collated
 
 
+def _extract_success_flag(info: dict[str, Any]) -> bool:
+    success = info.get("success", False)
+    if isinstance(success, np.ndarray):
+        if success.size == 0:
+            return False
+        return bool(np.any(success))
+    return bool(success)
+
+
 @register_env_config(UID)
 @dataclasses.dataclass
 class RobocasaConfig(BaseEnvConfig):
@@ -267,7 +276,7 @@ class RobocasaEnv(BaseEnv):
             )
             self._raw_obs_by_env[env_idx] = raw_obs
             rewards[env_idx] = float(reward)
-            terminated[env_idx] = bool(done)
+            terminated[env_idx] = bool(done) or _extract_success_flag(info)
             truncated[env_idx] = bool(env_truncated)
             infos.append(info)
 

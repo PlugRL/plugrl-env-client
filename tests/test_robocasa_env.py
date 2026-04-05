@@ -187,3 +187,43 @@ def test_robocasa_env_lerobot_action_encoding(monkeypatch):
         created_envs[0].recorded_actions[0]["action"],
         np.asarray([5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4], dtype=np.float32),
     )
+
+
+def test_robocasa_env_success_info_terminates_episode(monkeypatch):
+    class _SuccessWithoutDoneEnv(_FakeRoboCasaGymEnv):
+        def step(self, action_dict):
+            self.recorded_actions.append(action_dict)
+            token = self.env_idx * 1000 + self.step_count + 1
+            self.step_count += 1
+            return (
+                _make_raw_obs(token),
+                1.0,
+                False,
+                False,
+                {"success": True},
+            )
+
+    created_envs: list[_SuccessWithoutDoneEnv] = []
+
+    def fake_make_env(*, task_name: str, split: str, seed: int):
+        del task_name, split, seed
+        env = _SuccessWithoutDoneEnv(len(created_envs))
+        created_envs.append(env)
+        return env
+
+    monkeypatch.setattr(
+        "plugrl_env_client.envs.robocasa.robocasa_env._import_robocasa_dependencies",
+        lambda: (lambda action: {"action": np.asarray(action, dtype=np.float32)}),
+    )
+    monkeypatch.setattr(
+        "plugrl_env_client.envs.robocasa.robocasa_env._make_robocasa_env",
+        fake_make_env,
+    )
+
+    env = RobocasaEnv(RobocasaConfig(resize_size=8), num_envs=1)
+    env.reset()
+    _, _, terminated, truncated, info = env.step(np.arange(12, dtype=np.float32))
+
+    np.testing.assert_array_equal(terminated, np.asarray([True], dtype=np.bool_))
+    np.testing.assert_array_equal(truncated, np.asarray([False], dtype=np.bool_))
+    assert bool(info["success"][0]) is True

@@ -220,10 +220,11 @@ def rollout(
             if recorder is not None:
                 recorder.on_episode_done(done_indices, obs, info)
             finished_episodes += done_indices.size
-            obs, info = env.reset(options={"reset_indices": done_indices})
-            if recorder is not None:
-                recorder.on_reset(obs, info, reset_indices=done_indices)
-            step_id[done_indices] = 0
+            if finished_episodes < num_episodes:
+                obs, info = env.reset(options={"reset_indices": done_indices})
+                if recorder is not None:
+                    recorder.on_reset(obs, info, reset_indices=done_indices)
+                step_id[done_indices] = 0
         now = time.perf_counter()
         if now - last_timing_log_at >= 30.0:
             log_timing_summary(final=False)

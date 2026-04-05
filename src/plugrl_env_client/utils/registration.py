@@ -66,8 +66,14 @@ def make(env_id, config: BaseEnvConfig, num_envs: int = 1, **kwargs):
     env_spec = REGISTERED_ENVS[env_id]
     env = env_spec.make(config=config, num_envs=num_envs, **kwargs)
 
-    if env_spec.max_episode_steps is not None:
-        env = TimeLimitWrapper(env, max_episode_steps=env_spec.max_episode_steps)
+    runtime_max_episode_steps = getattr(config, "max_episode_steps", None)
+    effective_max_episode_steps = (
+        runtime_max_episode_steps
+        if runtime_max_episode_steps is not None
+        else env_spec.max_episode_steps
+    )
+    if effective_max_episode_steps is not None:
+        env = TimeLimitWrapper(env, max_episode_steps=effective_max_episode_steps)
 
     env = VectorEpisodeStatsWrapper(
         env,
