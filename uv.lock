@@ -1349,7 +1349,7 @@ wheels = [
 [[package]]
 name = "libero"
 version = "0.1.0"
-source = { git = "https://github.com/CTP314/LIBERO.git#f3bf9428c0d7113b0b72d1462d9552fca35fcf92" }
+source = { git = "https://github.com/CTP314/LIBERO.git?rev=f3bf9428c0d7113b0b72d1462d9552fca35fcf92#f3bf9428c0d7113b0b72d1462d9552fca35fcf92" }
 dependencies = [
     { name = "bddl" },
     { name = "cloudpickle" },
@@ -2291,7 +2291,7 @@ requires-dist = [
     { name = "gymnasium", extras = ["classic-control"], marker = "extra == 'classic'", specifier = ">=1.2.1,<2.0.0" },
     { name = "gymnasium-robotics", extras = ["mujoco-py"], marker = "extra == 'd4rl'", specifier = ">=1.4.1,<2.0.0" },
     { name = "imageio", extras = ["ffmpeg"], specifier = ">=2.37.2,<3.0.0" },
-    { name = "libero", marker = "extra == 'libero'", git = "https://github.com/CTP314/LIBERO.git" },
+    { name = "libero", marker = "extra == 'libero'", git = "https://github.com/CTP314/LIBERO.git?rev=f3bf9428c0d7113b0b72d1462d9552fca35fcf92" },
     { name = "loguru", specifier = ">=0.7.3,<0.8.0" },
     { name = "msgpack", specifier = ">=1.1.1,<2.0.0" },
     { name = "pandas", specifier = ">=2.3.3,<3.0.0" },

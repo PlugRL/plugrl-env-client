@@ -216,5 +216,5 @@ def test_best_reward_threshold_for_success_records_success():
     env.reset()
     _, _, terminated, _, info = env.step(np.array([0.0], dtype=np.float32))
     assert bool(np.asarray(terminated)[0]) is True
-    assert info["episode"]["s"] is True
+    assert bool(np.asarray(info["episode"]["s"], dtype=np.bool_)[0]) is True
     env.close()

@@ -2,6 +2,7 @@ import dataclasses
 import numpy as np
 import pathlib
 import math
+import gymnasium as gym
 
 try:
     from libero import benchmark
@@ -111,6 +112,13 @@ class LiberoEnv(BaseEnv):
         )
 
         self.env = env
+        low, high = self.env.env.action_spec
+        self.single_action_space = gym.spaces.Box(
+            low=np.asarray(low, dtype=np.float32),
+            high=np.asarray(high, dtype=np.float32),
+            dtype=np.float32,
+        )
+        self.action_space = self.single_action_space
         self.task_description = task_description
         self.initial_states = initial_states
 

@@ -46,7 +46,7 @@ d4rl = [
     "gymnasium-robotics[mujoco-py]>=1.4.1,<2.0.0",
 ]
 libero = [
-    "libero @ git+https://github.com/CTP314/LIBERO.git",
+    "libero @ git+https://github.com/CTP314/LIBERO.git@f3bf9428c0d7113b0b72d1462d9552fca35fcf92",
 ]
 
 [dependency-groups]
@@ -68,6 +68,9 @@ plugrl_env_client = ["**/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv]
+extra-build-variables = { "egl-probe" = { CMAKE_POLICY_VERSION_MINIMUM = "3.5" } }
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

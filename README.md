@@ -41,11 +41,20 @@ The easiest way to get started is by cloning the repository and using `uv` to ma
     With `uv`:
 
     ```bash
-    uv sync --extra robomimic --extra atari --extra classic
+    uv sync --extra robomimic --extra atari --extra classic --extra libero
     ```
 
     ```
-    pip install -e ".[robomimic, atari, classic]"
+    pip install -e ".[robomimic, atari, classic, libero]"
+    ```
+
+    Note: `robomimic` and `libero` pull in `egl-probe`, whose legacy CMake build
+    needs `CMAKE_POLICY_VERSION_MINIMUM=3.5` when using CMake 4+. `uv` is
+    configured in this repository to apply that automatically. If you install
+    with `pip`, set the variable manually, e.g.
+
+    ```bash
+    CMAKE_POLICY_VERSION_MINIMUM=3.5 pip install -e ".[libero]"
     ```
 
 ## 🚀 Usage
