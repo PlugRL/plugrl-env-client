@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Any, Dict, Optional, Tuple
 
@@ -29,6 +30,11 @@ def _get_close_details(exc: ConnectionClosed) -> tuple[int | None, str]:
 
 class ServerStopped(RuntimeError):
     """Raised when the server explicitly requests env clients to stop."""
+
+
+WS_PING_INTERVAL = float(os.environ.get("PLUGRL_WS_PING_INTERVAL_SECONDS", "60"))
+WS_PING_TIMEOUT = float(os.environ.get("PLUGRL_WS_PING_TIMEOUT_SECONDS", "180"))
+WS_CLOSE_TIMEOUT = float(os.environ.get("PLUGRL_WS_CLOSE_TIMEOUT_SECONDS", "30"))
 
 
 class WebSocketEnvClientAgent(_base_agent.BaseAgent):
@@ -78,6 +84,9 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
                     compression=None,
                     max_size=None,
                     additional_headers=headers,
+                    ping_interval=WS_PING_INTERVAL,
+                    ping_timeout=WS_PING_TIMEOUT,
+                    close_timeout=WS_CLOSE_TIMEOUT,
                 )
 
                 metadata_msg = msgpack_numpy.unpackb(conn.recv())

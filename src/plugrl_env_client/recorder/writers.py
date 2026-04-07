@@ -160,7 +160,7 @@ class VideoArtifactWriter:
             writer.append_data(grid)
 
     def close(self) -> None:
-        for writer in self._full_video_writers.values():
+        for key, writer in list(self._full_video_writers.items()):
             writer.close()
         self._full_video_writers.clear()
 

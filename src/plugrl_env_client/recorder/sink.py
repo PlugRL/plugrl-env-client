@@ -18,7 +18,7 @@ class AsyncRecorderSink:
         self._handler = handler
         self._on_close = on_close
         self._queue: Queue[Any | None] = Queue()
-        self._thread = Thread(target=self._run, name=name, daemon=True)
+        self._thread = Thread(target=self._run, name=name, daemon=False)
         self._error: BaseException | None = None
         self._thread.start()
 

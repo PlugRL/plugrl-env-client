@@ -98,7 +98,6 @@ class Recorder:
         self._sink = AsyncRecorderSink(
             name=f"recorder-writer-{self.proc_index}",
             handler=self._handle_event,
-            on_close=self._video_writer.close,
         )
         write_json(
             self.root_dir / "manifest.json",
@@ -210,9 +209,16 @@ class Recorder:
         if not self.should_write:
             return
 
+        logger.info(
+            "Recorder closing proc=%s completed_episodes=%s full_rollout_video=%s",
+            self.proc_index,
+            self.completed_episodes,
+            self.full_rollout_video,
+        )
         if self._sink is not None:
             self._sink.close()
-
+        if self.args.record_video:
+            self._video_writer.close()
         write_json(
             self.summary_path,
             {
@@ -226,6 +232,7 @@ class Recorder:
                 "mean_success_rate": self._mean_success_rate(),
             },
         )
+        logger.info("Recorder closed proc=%s summary_path=%s", self.proc_index, self.summary_path)
 
     def _mean_return(self) -> float:
         if not self.return_window:

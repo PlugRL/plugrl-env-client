@@ -10,6 +10,28 @@ from plugrl_env_client.recorder import Recorder
 from plugrl_env_client.utils.rollout import _get_action_spec, _select_info, _select_obs
 
 
+def _sanitize_done_observations(next_obs, prev_obs, done: np.ndarray):
+    done_arr = np.asarray(done, dtype=np.bool_)
+    if not np.any(done_arr):
+        return next_obs
+
+    done_indices = np.nonzero(done_arr)[0]
+    images = {key: np.array(value, copy=True) for key, value in next_obs.images.items()}
+    states = {key: np.array(value, copy=True) for key, value in next_obs.states.items()}
+    text = np.array(next_obs.text, copy=True)
+
+    # Some env backends expose the first observation of the next episode on the
+    # same step that reports done. For done envs, keep the last in-episode view
+    # so recorder/debug output and terminal feedback don't spill into a reset.
+    for key in images:
+        images[key][done_indices] = prev_obs.images[key][done_indices]
+    for key in states:
+        states[key][done_indices] = prev_obs.states[key][done_indices]
+    text[done_indices] = prev_obs.text[done_indices]
+
+    return type(next_obs)(images=images, states=states, text=text)
+
+
 def rollout(
     env: gym.vector.VectorEnv,
     agent: WebSocketEnvClientAgent,
@@ -59,9 +81,12 @@ def rollout(
         total_collect_time = (
             infer_wait_total + infer_obs_pack_total + env_step_total + feedback_total
         )
+        proc_index = None if recorder is None else recorder.proc_index
         logger.info(
-            "{} rollout timing summary: env_steps={} infer_calls={} feedback_calls={} infer_wait={:.3f}s infer_obs_pack={:.3f}s env_step={:.3f}s feedback_total={:.3f}s feedback_obs_pack={:.3f}s feedback_info_pack={:.3f}s effective_fps={:.2f}",
+            "{} rollout timing summary: proc={} num_envs={} cumulative_env_steps={} infer_calls={} feedback_calls={} infer_wait={:.3f}s infer_obs_pack={:.3f}s env_step={:.3f}s feedback_total={:.3f}s feedback_obs_pack={:.3f}s feedback_info_pack={:.3f}s effective_fps={:.2f}",
             "Final" if final else "Intermediate",
+            proc_index,
+            num_envs,
             total_env_steps,
             infer_call_count,
             feedback_call_count,
@@ -148,12 +173,11 @@ def rollout(
             raise RuntimeError("Action plan is not ready for all envs")
 
         actions = action_plan[np.arange(num_envs), plan_pos]
+        prev_obs = obs
         env_step_started_at = time.perf_counter()
         obs, reward, terminated, truncated, info = env.step(actions)
         env_step_total += time.perf_counter() - env_step_started_at
         total_env_steps += num_envs
-        if recorder is not None:
-            recorder.on_step(obs, reward, terminated, truncated, info)
 
         plan_pos += 1
 
@@ -161,6 +185,10 @@ def rollout(
         terminated = np.asarray(terminated, dtype=np.bool_)
         truncated = np.asarray(truncated, dtype=np.bool_)
         done = np.logical_or(terminated, truncated)
+        terminal_safe_obs = _sanitize_done_observations(obs, prev_obs, done)
+
+        if recorder is not None:
+            recorder.on_step(terminal_safe_obs, reward, terminated, truncated, info)
 
         chunk_reward += reward
 
@@ -172,7 +200,9 @@ def rollout(
         if feedback_indices.size:
             feedback_started_at = time.perf_counter()
             feedback_obs_pack_started_at = time.perf_counter()
-            feedback_obs = dataclasses.asdict(_select_obs(obs, feedback_indices))
+            feedback_obs = dataclasses.asdict(
+                _select_obs(terminal_safe_obs, feedback_indices)
+            )
             feedback_obs_pack_total += (
                 time.perf_counter() - feedback_obs_pack_started_at
             )
@@ -193,7 +223,7 @@ def rollout(
                         "step_ids": step_id[debug_feedback_indices],
                         "data": {
                             "obs": dataclasses.asdict(
-                                _select_obs(obs, debug_feedback_indices)
+                                _select_obs(terminal_safe_obs, debug_feedback_indices)
                             ),
                             "rewards": chunk_reward[debug_feedback_indices],
                             "terminated": terminated[debug_feedback_indices],
@@ -218,7 +248,7 @@ def rollout(
 
         if done_indices.size:
             if recorder is not None:
-                recorder.on_episode_done(done_indices, obs, info)
+                recorder.on_episode_done(done_indices, terminal_safe_obs, info)
             finished_episodes += done_indices.size
             if finished_episodes < num_episodes:
                 obs, info = env.reset(options={"reset_indices": done_indices})
