@@ -1,11 +1,13 @@
 [project]
 name = "plugrl-env-client"
 version = "0.1.0"
-description = ""
+description = "PlugRL environment client: runs Gymnasium environments and speaks the PlugRL wire protocol."
 authors = [
     {name = "chenhao lu",email = "luch21@mails.tsinghua.edu.cn"}
 ]
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "loguru>=0.7.3,<0.8.0",
@@ -73,5 +75,5 @@ testpaths = ["tests"]
 extra-build-variables = { "egl-probe" = { CMAKE_POLICY_VERSION_MINIMUM = "3.5" } }
 
 [build-system]
-requires = ["setuptools>=69", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
