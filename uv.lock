@@ -2297,7 +2297,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3.3,<3.0.0" },
     { name = "patchelf", marker = "extra == 'd4rl'", specifier = ">=0.17.2.4,<0.18.0" },
     { name = "patchelf", marker = "extra == 'robomimic'", specifier = ">=0.17.2.4,<0.18.0" },
-    { name = "plugrl-protocol", git = "https://github.com/PlugRL/plugrl-protocol.git" },
+    { name = "plugrl-protocol", git = "https://github.com/PlugRL/plugrl-protocol.git?rev=c7961da3ca050717ad3a01721f00afa1ed29bf47" },
     { name = "pyopengl", marker = "extra == 'robomimic'", specifier = "==3.1.4" },
     { name = "robomimic", marker = "extra == 'robomimic'", specifier = "==0.3.0" },
     { name = "robosuite", marker = "extra == 'robomimic'", specifier = "<1.5.0" },
@@ -2316,7 +2316,7 @@ dev = [
 [[package]]
 name = "plugrl-protocol"
 version = "0.1.0"
-source = { git = "https://github.com/PlugRL/plugrl-protocol.git#c7961da3ca050717ad3a01721f00afa1ed29bf47" }
+source = { git = "https://github.com/PlugRL/plugrl-protocol.git?rev=c7961da3ca050717ad3a01721f00afa1ed29bf47#c7961da3ca050717ad3a01721f00afa1ed29bf47" }
 dependencies = [
     { name = "msgpack" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
