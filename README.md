@@ -1,5 +1,8 @@
 # 🚀 plugrl-env-client
 
+[![CI](https://github.com/PlugRL/plugrl-env-client/actions/workflows/ci.yml/badge.svg)](https://github.com/PlugRL/plugrl-env-client/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **plugrl-env-client** runs Gymnasium environments and talks to a centralized PlugRL training server over WebSocket. It carries no deep learning dependencies, so an environment stack and a training stack never have to share a Python environment.
 
 ## ✨ Features
