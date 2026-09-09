@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Run pre-commit
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # plugrl-protocol is a private repository, and the default GITHUB_TOKEN
+      # cannot read other repositories in the org. Set this secret to a token
+      # with read access, or make plugrl-protocol public and drop both this
+      # and the step below.
+      PLUGRL_CI_TOKEN: ${{ secrets.PLUGRL_CI_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate for the private plugrl-protocol dependency
+        if: env.PLUGRL_CI_TOKEN != ''
+        run: |
+          git config --global \
+            "url.https://x-access-token:${PLUGRL_CI_TOKEN}@github.com/.insteadOf" \
+            "https://github.com/"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # No extras: the point of this package is that it installs without a
+      # deep learning stack, and the test suite asserts exactly that.
+      - name: Sync
+        run: uv sync --frozen
+
+      - name: Test
+        run: uv run pytest -q
