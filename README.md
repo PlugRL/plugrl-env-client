@@ -1,13 +1,14 @@
 # 🚀 plugrl-env-client
 
-**plugrl-env-client** (Vision Language Action Reinforcement Learning Infrastructure) runs environments and talks to a centralized training server, enabling scalable RL experiments.
+**plugrl-env-client** runs Gymnasium environments and talks to a centralized PlugRL training server over WebSocket. It carries no deep learning dependencies, so an environment stack and a training stack never have to share a Python environment.
 
 ## ✨ Features
 
-  * **Distributed Communication**: Utilizes `websockets` and `msgpack` for fast, secure, and asynchronous data transfer between the central server and multiple environment workers.
-    * **Modular Design**: Separates the environment-side runtime (`plugrl-env-client`) from the shared protocol layer (`plugrl-protocol`).
-  * **Command-Line Interface**: Provides a user-friendly CLI powered by `tyro` for starting and managing RL tasks.
-  * **Gymnasium Integration**: Seamlessly works with `Gymnasium` environments for standardized and flexible environment interaction.
+  * **No deep learning dependencies**: The policy stays on the server. This side needs only `gymnasium`, `websockets` and `msgpack`, so environments pinned to old `mujoco-py` or `cython<3` can be used with a modern training stack.
+  * **Distributed communication**: `websockets` plus `msgpack` for asynchronous transfer between the server and any number of env clients, across machines.
+  * **Modular design**: Separates the environment-side runtime (`plugrl-env-client`) from the shared protocol layer (`plugrl-protocol`).
+  * **Command-line interface**: A `tyro`-powered CLI for starting and managing env clients.
+  * **Gymnasium integration**: Works with standard `Gymnasium` environments.
 
 -----
 
@@ -22,7 +23,7 @@ The easiest way to get started is by cloning the repository and using `uv` to ma
     cd plugrl-env-client
     ```
 
-2.  **Install dependencies with Pip:**
+2.  **Install dependencies:**
 
     **Option A: Use uv (recommended)**
 
@@ -69,45 +70,18 @@ The `plugrl-run-env-client` tool launches one or more env client processes for s
 uv run plugrl-run-env-client <ENVIRONMENT_TYPE> [OPTIONS]
 ```
 
-### Remote Viewer Usage (`--use-remote-viewer`)
-
-The `--use-remote-viewer` flag enables the worker to send environment observation data (like images and states) to a separate, remote viewer application for real-time visualization.
-
-| Option | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `--use-remote-viewer` | FLAG | `False` | **Enables** the worker to stream data to a remote viewer. |
-| `--viewer-host` | STR | `0.0.0.0` | IP address where the viewer is expected to be running. |
-| `--viewer-port` | INT | `8001` | Port where the viewer is expected to be listening for connections. |
-
-#### How to Use the Remote Viewer
-
-To utilize this feature, you must first start the **viewer frontend** in a separate terminal, typically from the **`plugrl-viewer`** project.
-
-1.  **Start the Viewer Frontend:**
-    In your `plugrl-viewer` project directory, run the following command to start the web application (listening on the default port `8001`):
-
-    ```bash
-    uvicorn plugrl_viewer.main:app --reload --port 8001
-    ```
-
-2.  **Run the Env Client with the Flag:**
-    In your `plugrl-server` project, execute the worker command, making sure to include the `--use-remote-viewer` flag:
-
-    ```bash
-    # Example: Run the dummy worker and stream data to the viewer on port 8001
-    plugrl-run-env-client dummy-v1 --use-remote-viewer
-    ```
-
-The worker will then attempt to establish a WebSocket connection with the viewer at the specified host and port (defaulting to `0.0.0.0:8001`) and begin streaming environment data.
-
 ### Available Environments
 
-| Type | Description |
-| :--- | :--- |
-| **dummy-v1** | Dummy/testing environment |
-| **classic-v1** | Classic control environments (e.g., CartPole) |
-| **robomimic-v1** | RoboMimic-based robotic manipulation environment |
-| **atari-v1** | Atari game environment |
+| Type | Extra required | Description |
+| :--- | :--- | :--- |
+| **dummy-v1** | — | Dummy environment for protocol and connectivity tests |
+| **classic-v1** | `classic` | Classic control environments (e.g. CartPole) |
+| **atari-v1** | `atari` | Atari games via ALE |
+| **d4rl-v1** | `d4rl` | D4RL locomotion tasks |
+| **robomimic-v1** | `robomimic` | RoboMimic robotic manipulation |
+| **libero-v1** | `libero` | LIBERO manipulation benchmark |
+
+An environment whose extra is not installed reports which extra it needs.
 
 ### Examples
 
