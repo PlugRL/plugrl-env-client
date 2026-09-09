@@ -107,6 +107,18 @@ class RobomimicEnv(BaseEnv):
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
     ) -> tuple[Observation, dict]:
+        if seed is not None:
+            # Refusing is better than pretending. The robosuite simulation
+            # underneath carries randomness this wrapper does not reach, so
+            # accepting the seed would produce runs that look reproducible and
+            # are not - exactly the failure seeding exists to prevent. A sweep
+            # asking for seeds should fail on its first episode rather than
+            # after burning a hundred jobs.
+            raise NotImplementedError(
+                "robomimic-v1 cannot honour a seed yet: the robosuite "
+                "simulation underneath is not seeded by this wrapper. Either "
+                "run without --runner.seed, or seed the underlying env first."
+            )
         obs = self.env.reset()
         agentview_image = self._render_agentview_image()
         return self.prepare_obs(obs, agentview_image), {}

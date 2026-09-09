@@ -18,8 +18,12 @@ def rollout(
     replan_steps: int | None,
     num_envs: int,
     recorder: Recorder | None = None,
+    seed: int | None = None,
 ) -> None:
-    obs, info = env.reset()
+    # Only the first reset carries the seed; later resets continue the stream
+    # the env already established, which is what makes the whole rollout - not
+    # just its first episode - reproducible.
+    obs, info = env.reset(seed=seed)
     if recorder is not None:
         recorder.on_reset(obs, info, reset_indices=None)
 

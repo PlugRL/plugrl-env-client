@@ -58,6 +58,11 @@ class DummyEnv(BaseEnv):
         self.action_space = self.single_action_space
 
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> tuple:
+        self.seed_rngs(seed)
+        if seed is not None:
+            # A fresh seed means a fresh episode, not a continuation of
+            # whatever this env was holding.
+            self._obs = None
         if self._obs is None:
             self._obs = self.fake_obs()
 
@@ -83,32 +88,34 @@ class DummyEnv(BaseEnv):
         return self._obs, {}
 
     def step(self, actions: Action) -> tuple:
-        reward = np.random.rand(self.num_envs).astype(np.float32)
-        terminated = (np.random.rand(self.num_envs) < self.terminated_prob).astype(
-            np.bool_
-        )
+        reward = self.np_random.random(self.num_envs).astype(np.float32)
+        terminated = (
+            self.np_random.random(self.num_envs) < self.terminated_prob
+        ).astype(np.bool_)
         truncated = np.zeros((self.num_envs,), dtype=np.bool_)
         obs = self.fake_obs()
         self._obs = obs
         return obs, reward, terminated, truncated, {}
 
     def fake_action(self) -> Action:
-        return np.random.rand(self.num_envs, self.action_dim).astype(np.float32)
+        return self.np_random.random((self.num_envs, self.action_dim)).astype(
+            np.float32
+        )
 
     def fake_obs(self) -> Observation:
         b = self.num_envs
         obs = Observation(
             images={
-                "base": np.random.randint(
+                "base": self.np_random.integers(
                     0, 255, (b, self.img_height, self.img_width, 3)
                 ).astype(np.uint8),
-                "wrist": np.random.randint(
+                "wrist": self.np_random.integers(
                     0, 255, (b, self.img_height // 2, self.img_width // 2, 3)
                 ).astype(np.uint8),
             },
             states={
-                "robot_state": np.random.rand(b, self.state_dim),
-                "joint_angles": np.random.rand(b, self.state_dim // 2),
+                "robot_state": self.np_random.random((b, self.state_dim)),
+                "joint_angles": self.np_random.random((b, self.state_dim // 2)),
             },
             text=self.text,
         )

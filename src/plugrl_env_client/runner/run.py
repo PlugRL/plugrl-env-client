@@ -14,6 +14,23 @@ from plugrl_env_client.runner.rollout import rollout
 AgentFactory = Callable[[], BaseAgent]
 
 
+def derive_process_seed(
+    seed: int | None, *, process_id: int | None, num_envs: int
+) -> int | None:
+    """Give each client process its own slice of the seed space.
+
+    A vector env seeds its sub-envs from seed, seed+1, ... so processes have to
+    be at least num_envs apart. Handing every process the same base seed would
+    have them all replay the same trajectory, which looks like data collection
+    and is not.
+    """
+    if seed is None:
+        return None
+    if process_id is None:
+        return int(seed)
+    return int(seed) + int(process_id) * max(1, int(num_envs))
+
+
 def _make_env(
     args: RunnerArgs,
     env_config: BaseEnvConfig,
@@ -77,6 +94,7 @@ def run(
         process_id=process_id,
         total_processes=total_processes,
     )
+    seed = derive_process_seed(args.seed, process_id=process_id, num_envs=num_envs)
     try:
         rollout(
             env,
@@ -85,6 +103,7 @@ def run(
             replan_steps=args.replan_steps,
             num_envs=num_envs,
             recorder=recorder,
+            seed=seed,
         )
     finally:
         recorder.close()

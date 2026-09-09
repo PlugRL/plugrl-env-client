@@ -5,6 +5,7 @@ from typing import Any, Dict, Annotated, TypeVar
 import numpy.typing as npt
 
 import numpy as np
+from gymnasium.utils import seeding
 from gymnasium.vector import VectorEnv, AutoresetMode
 
 DType = TypeVar("DType", bound=np.generic)
@@ -98,6 +99,16 @@ class BaseEnv(VectorEnv[Observation, Action, np.ndarray], abc.ABC):
         self.process_id = process_id
         self.total_processes = total_processes
         self.num_envs = int(num_envs)
+
+    def seed_rngs(self, seed: int | None) -> None:
+        """Seed this env's generator. Call first thing in reset().
+
+        Draw randomness from `self.np_random` rather than the module-level
+        `np.random`, or the seed will have no effect: `np.random` is global
+        state that nothing here owns.
+        """
+        if seed is not None:
+            self._np_random, self._np_random_seed = seeding.np_random(seed)
 
     @abc.abstractmethod
     def reset(

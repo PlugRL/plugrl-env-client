@@ -22,3 +22,8 @@ class RunnerArgs:
     replan_steps: int | None = None
     # Optional max episode horizon override passed into env creation.
     max_episode_steps: int | None = None
+
+    # Base seed for environment randomness. Left unset, episodes differ between
+    # runs and results cannot be reproduced. With multiple client processes each
+    # one takes a disjoint slice of the seed space; see derive_process_seed.
+    seed: int | None = None
