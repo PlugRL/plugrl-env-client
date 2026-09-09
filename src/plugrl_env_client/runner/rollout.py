@@ -10,6 +10,55 @@ from plugrl_env_client.recorder import Recorder
 from plugrl_env_client.utils.rollout import _get_action_spec, _select_info, _select_obs
 
 
+@dataclasses.dataclass
+class RolloutTiming:
+    """Where a rollout's wall clock actually went.
+
+    The interesting output is the fractions: whether a configuration is
+    bounded by the environment, by waiting on the server, or by packing
+    observations differs by orders of magnitude across environment families,
+    and that is not visible from throughput alone.
+    """
+
+    infer_wait: float = 0.0
+    infer_obs_pack: float = 0.0
+    env_step: float = 0.0
+    feedback: float = 0.0
+    feedback_obs_pack: float = 0.0
+    feedback_info_pack: float = 0.0
+    infer_calls: int = 0
+    feedback_calls: int = 0
+    env_steps: int = 0
+
+    # The stages that make up one collection cycle. feedback_obs_pack and
+    # feedback_info_pack are already inside feedback, so counting them here
+    # too would double-count them.
+    _STAGES = ("infer_wait", "infer_obs_pack", "env_step", "feedback")
+
+    @property
+    def collect_time(self) -> float:
+        return sum(getattr(self, stage) for stage in self._STAGES)
+
+    def as_dict(self) -> dict:
+        total = self.collect_time
+        out = {
+            "env_steps": self.env_steps,
+            "infer_calls": self.infer_calls,
+            "feedback_calls": self.feedback_calls,
+            "infer_wait_s": self.infer_wait,
+            "infer_obs_pack_s": self.infer_obs_pack,
+            "env_step_s": self.env_step,
+            "feedback_s": self.feedback,
+            "feedback_obs_pack_s": self.feedback_obs_pack,
+            "feedback_info_pack_s": self.feedback_info_pack,
+            "collect_time_s": total,
+            "effective_fps": (self.env_steps / total) if total > 0 else 0.0,
+        }
+        for stage in self._STAGES:
+            out[f"{stage}_frac"] = (getattr(self, stage) / total) if total > 0 else 0.0
+        return out
+
+
 def rollout(
     env: gym.vector.VectorEnv,
     agent: WebSocketEnvClientAgent,
@@ -42,34 +91,23 @@ def rollout(
 
     step_id = np.zeros((num_envs,), dtype=np.int64)
 
-    infer_wait_total = 0.0
-    infer_obs_pack_total = 0.0
-    env_step_total = 0.0
-    feedback_total = 0.0
-    feedback_obs_pack_total = 0.0
-    feedback_info_pack_total = 0.0
-    infer_call_count = 0
-    feedback_call_count = 0
-    total_env_steps = 0
+    timing = RolloutTiming()
     last_timing_log_at = time.perf_counter()
 
     def log_timing_summary(final: bool = False) -> None:
-        total_collect_time = (
-            infer_wait_total + infer_obs_pack_total + env_step_total + feedback_total
-        )
         logger.info(
             "{} rollout timing summary: env_steps={} infer_calls={} feedback_calls={} infer_wait={:.3f}s infer_obs_pack={:.3f}s env_step={:.3f}s feedback_total={:.3f}s feedback_obs_pack={:.3f}s feedback_info_pack={:.3f}s effective_fps={:.2f}",
             "Final" if final else "Intermediate",
-            total_env_steps,
-            infer_call_count,
-            feedback_call_count,
-            infer_wait_total,
-            infer_obs_pack_total,
-            env_step_total,
-            feedback_total,
-            feedback_obs_pack_total,
-            feedback_info_pack_total,
-            0.0 if total_collect_time <= 0 else total_env_steps / total_collect_time,
+            timing.env_steps,
+            timing.infer_calls,
+            timing.feedback_calls,
+            timing.infer_wait,
+            timing.infer_obs_pack,
+            timing.env_step,
+            timing.feedback,
+            timing.feedback_obs_pack,
+            timing.feedback_info_pack,
+            timing.as_dict()["effective_fps"],
         )
 
     finished_episodes = 0
@@ -78,7 +116,7 @@ def rollout(
         if need_infer.size:
             infer_obs_pack_started_at = time.perf_counter()
             obs_msg = dataclasses.asdict(_select_obs(obs, need_infer))
-            infer_obs_pack_total += time.perf_counter() - infer_obs_pack_started_at
+            timing.infer_obs_pack += time.perf_counter() - infer_obs_pack_started_at
 
             infer_wait_started_at = time.perf_counter()
             action_chunk = agent.infer(
@@ -86,8 +124,8 @@ def rollout(
                 env_indices=need_infer,
                 step_ids=step_id[need_infer],
             )["action"]
-            infer_wait_total += time.perf_counter() - infer_wait_started_at
-            infer_call_count += 1
+            timing.infer_wait += time.perf_counter() - infer_wait_started_at
+            timing.infer_calls += 1
 
             steps = replan_steps or len(action_chunk)
             if len(action_chunk) < steps:
@@ -124,8 +162,8 @@ def rollout(
         actions = action_plan[np.arange(num_envs), plan_pos]
         env_step_started_at = time.perf_counter()
         obs, reward, terminated, truncated, info = env.step(actions)
-        env_step_total += time.perf_counter() - env_step_started_at
-        total_env_steps += num_envs
+        timing.env_step += time.perf_counter() - env_step_started_at
+        timing.env_steps += num_envs
         if recorder is not None:
             recorder.on_step(obs, reward, terminated, truncated, info)
 
@@ -147,12 +185,12 @@ def rollout(
             feedback_started_at = time.perf_counter()
             feedback_obs_pack_started_at = time.perf_counter()
             feedback_obs = dataclasses.asdict(_select_obs(obs, feedback_indices))
-            feedback_obs_pack_total += (
+            timing.feedback_obs_pack += (
                 time.perf_counter() - feedback_obs_pack_started_at
             )
             feedback_info_pack_started_at = time.perf_counter()
             feedback_info = _select_info(info, feedback_indices, num_envs=num_envs)
-            feedback_info_pack_total += (
+            timing.feedback_info_pack += (
                 time.perf_counter() - feedback_info_pack_started_at
             )
             agent.feedback(
@@ -164,8 +202,8 @@ def rollout(
                 env_indices=feedback_indices,
                 step_ids=step_id[feedback_indices],
             )
-            feedback_total += time.perf_counter() - feedback_started_at
-            feedback_call_count += 1
+            timing.feedback += time.perf_counter() - feedback_started_at
+            timing.feedback_calls += 1
             chunk_reward[feedback_indices] = 0.0
             step_id[feedback_indices] += 1
 
@@ -183,3 +221,5 @@ def rollout(
             last_timing_log_at = now
 
     log_timing_summary(final=True)
+    if recorder is not None:
+        recorder.record_timing(timing)
