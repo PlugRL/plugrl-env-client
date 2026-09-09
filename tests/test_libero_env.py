@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-libero_env_module = pytest.importorskip("plugrl_env_client.envs.libero.libero_env")
+libero_env_module = pytest.importorskip(
+    "plugrl_env_client.envs.libero.libero_env",
+    exc_type=ImportError,
+    reason="requires the libero extra",
+)
 
 LiberoConfig = libero_env_module.LiberoConfig
 LiberoEnv = libero_env_module.LiberoEnv

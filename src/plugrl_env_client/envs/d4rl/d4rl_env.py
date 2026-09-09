@@ -1,8 +1,8 @@
 import dataclasses
 import numpy as np
-import gym
 
 try:
+    import gym
     import d4rl.gym_mujoco  # noqa: F401
 except ImportError:
     raise ImportError(
