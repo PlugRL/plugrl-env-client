@@ -120,6 +120,17 @@ class BaseEnv(VectorEnv[Observation, Action, np.ndarray], abc.ABC):
         self, actions: Action
     ) -> tuple[Observation, RewardArray, BoolArray, BoolArray, dict]: ...
 
-    def fake_action(self) -> Action: ...
+    # Not abstract, because most envs have no use for them - but the bodies
+    # raise rather than return None. Returning None sends the failure to
+    # whoever eventually indexes the result, which is a long way from the
+    # class that did not implement it.
+    def fake_action(self) -> Action:
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement fake_action(). Sample "
+            "from self.action_space instead, or implement it."
+        )
 
-    def fake_obs(self) -> Observation: ...
+    def fake_obs(self) -> Observation:
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement fake_obs()."
+        )

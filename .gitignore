@@ -14,4 +14,6 @@ dist/
 logs
 tmp
 runs
+# a server started from this directory writes here
+checkpoints
 .codex

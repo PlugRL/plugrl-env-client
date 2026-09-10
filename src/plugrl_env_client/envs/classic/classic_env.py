@@ -42,6 +42,10 @@ class ClassicEnv(BaseEnv):
         env = gym.make(config.name, render_mode="rgb_array")
         self.env = env
         self.game_name = config.name
+        # rollout() sizes its action plan from this before the first step, so
+        # an env without it cannot run at all.
+        self.single_action_space = env.action_space
+        self.action_space = env.action_space
 
     def prepare_obs(self, obs: np.ndarray) -> Observation:
         frame = self.env.render()

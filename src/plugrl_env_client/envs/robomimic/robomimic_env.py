@@ -4,6 +4,7 @@ os.environ["MUJOCO_GL"] = "egl"
 import json
 import pathlib
 import numpy as np
+import gymnasium as gym
 
 try:
     import robomimic  # type: ignore
@@ -90,6 +91,18 @@ class RobomimicEnv(BaseEnv):
         self.image_keys = env_meta["env_kwargs"]["camera_names"]
         self.task = env_meta["env_name"]
         self.agentview_image_size = config.agentview_image_size
+
+        # rollout() sizes its action plan from this before the first step, so
+        # an env without it cannot run at all. Only shape and dtype are read;
+        # robosuite normalises actions to [-1, 1], and the bounds go unused
+        # either way.
+        self.single_action_space = gym.spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(int(env.action_dimension),),
+            dtype=np.float32,
+        )
+        self.action_space = self.single_action_space
 
     def prepare_obs(self, obs, agentview_image) -> Observation:
         images = {}
