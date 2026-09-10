@@ -4,8 +4,10 @@ from pathlib import Path
 from typing import Any, Callable, cast
 
 import gymnasium as gym
+from loguru import logger
 
 from plugrl_env_client.agent.base_agent import BaseAgent
+from plugrl_env_client.agent.websocket_env_client_agent import ServerStopped
 from plugrl_env_client.envs.base_env import BaseEnvConfig
 from plugrl_env_client.recorder import Recorder, RecorderArgs
 from plugrl_env_client.runner.args import RunnerArgs
@@ -29,6 +31,40 @@ def derive_process_seed(
     if process_id is None:
         return int(seed)
     return int(seed) + int(process_id) * max(1, int(num_envs))
+
+
+def report_server_metadata(agent: BaseAgent, *, replan_steps: int | None) -> None:
+    """Say what the server said about itself, and flag one mismatch.
+
+    The `metadata` message (SPEC.md section 5.1) is the only thing a client
+    receives before it has to commit to a configuration, and until recently
+    it was always empty. Now that it describes the policy, the one setting
+    it can check is `replan_steps`: asking for more steps than the policy
+    plans fails inside rollout, but only after a full inference round trip,
+    and the message there does not mention the policy or the horizon.
+
+    This warns rather than raises. The keys are descriptive and a client
+    must not require them, so an absent or stale `action_horizon` has to
+    stay survivable - the real check is still the one in rollout, against
+    the chunk that actually arrives.
+    """
+    metadata = getattr(agent, "get_server_metadata", dict)() or {}
+    if not metadata:
+        logger.info("Server sent no metadata; action shape is whatever arrives.")
+        return
+
+    logger.info("Server metadata: {}", metadata)
+
+    horizon = metadata.get("action_horizon")
+    if replan_steps and isinstance(horizon, int) and replan_steps > horizon:
+        logger.warning(
+            "replan_steps={} exceeds the action_horizon={} that {} reports. "
+            "The first inference will fail unless the server is lying about "
+            "its horizon.",
+            replan_steps,
+            horizon,
+            metadata.get("policy", "the server"),
+        )
 
 
 def _make_env(
@@ -86,6 +122,7 @@ def run(
         env_lock=env_lock,
     )
     agent = agent_factory()
+    report_server_metadata(agent, replan_steps=args.replan_steps)
     recorder = Recorder(
         recorder_args,
         exp_name=exp_name,
@@ -104,6 +141,23 @@ def run(
             num_envs=num_envs,
             recorder=recorder,
             seed=seed,
+        )
+    except ServerStopped:
+        # The end of training, not a failure. The server closes with
+        # `plugrl-server-stop` (SPEC.md section 7.1) once the algorithm has
+        # taken every step it was asked for, and a client with
+        # reconnect_on_server_stop off has nothing left to do.
+        #
+        # This used to escape as an unhandled exception, so the documented
+        # happy path - run a server for N steps, point a client at it - ended
+        # in a traceback and exit 1 on both sides of a successful run. Under
+        # run_multiprocess the non-zero child exit also tore down its
+        # siblings mid-episode.
+        logger.info(
+            "Server signalled the end of the run; collection stopped after "
+            "{}/{} episodes.",
+            recorder.total_episode_count,
+            num_episodes,
         )
     finally:
         recorder.close()
