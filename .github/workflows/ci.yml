@@ -34,21 +34,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    env:
-      # plugrl-protocol is a private repository, and the default GITHUB_TOKEN
-      # cannot read other repositories in the org. Set this secret to a token
-      # with read access, or make plugrl-protocol public and drop both this
-      # and the step below.
-      PLUGRL_CI_TOKEN: ${{ secrets.PLUGRL_CI_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Authenticate for the private plugrl-protocol dependency
-        if: env.PLUGRL_CI_TOKEN != ''
-        run: |
-          git config --global \
-            "url.https://x-access-token:${PLUGRL_CI_TOKEN}@github.com/.insteadOf" \
-            "https://github.com/"
 
       - uses: astral-sh/setup-uv@v5
         with:
