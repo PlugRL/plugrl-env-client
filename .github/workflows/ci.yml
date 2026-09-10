@@ -15,6 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # pre-commit builds its hook environments with a system interpreter,
+      # and .pre-commit-config pins default_language_version to python3.10.
+      # setup-uv provides no system python, so without this the hooks fail
+      # with "failed to find interpreter for python_spec='python3.10'".
+      #
+      # Note this disagrees with .python-version, which says 3.11. Worth
+      # reconciling, but CI should install what the config asks for rather
+      # than quietly pick a side.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
