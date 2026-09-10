@@ -32,14 +32,32 @@ def _select_info(
 def _get_action_spec(
     env: gym.vector.VectorEnv, *, num_envs: int
 ) -> tuple[tuple[int, ...], np.dtype]:
+    """The shape and dtype of one environment's action.
+
+    `single_action_space` is unbatched by Gymnasium's own definition, so its
+    shape is taken as-is. Guessing at a batch dimension there - by asking
+    whether the leading axis happens to equal `num_envs` - can only ever be
+    wrong: it silently drops a real action dimension whenever an environment
+    with a `num_envs`-dimensional action is run with that many environments,
+    which for a 7-DoF arm means `--num-envs 7`.
+
+    The `action_space` fallback is different. On a Gymnasium vector env that
+    attribute *is* the batched space, so the heuristic stays there, for envs
+    that expose no `single_action_space` at all.
+    """
     try:
-        space = env.single_action_space
+        return tuple(map(int, env.single_action_space.shape)), np.dtype(
+            env.single_action_space.dtype
+        )
     except AttributeError:
-        try:
-            space = env.action_space
-        except AttributeError as exc:
-            raise ValueError(
-                "Env must expose action space via single_action_space/action_space"
-            ) from exc
+        pass
+
+    try:
+        space = env.action_space
+    except AttributeError as exc:
+        raise ValueError(
+            "Env must expose action space via single_action_space/action_space"
+        ) from exc
+
     shape = tuple(map(int, space.shape))
     return (shape[1:] if shape[:1] == (num_envs,) else shape), np.dtype(space.dtype)
