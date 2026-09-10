@@ -16,7 +16,7 @@ dependencies = [
     "websockets>=15.0.1,<16.0.0",
     "msgpack>=1.1.1,<2.0.0",
     "tyro>=0.9.31,<0.10.0",
-    "plugrl-protocol @ git+https://github.com/PlugRL/plugrl-protocol.git@c7961da3ca050717ad3a01721f00afa1ed29bf47",
+    "plugrl-protocol @ git+https://github.com/PlugRL/plugrl-protocol.git@a64ef63e6b74da7c579d59111559b0125346f702",
     "pandas>=2.3.3,<3.0.0",
     "imageio[ffmpeg]>=2.37.2,<3.0.0",
 ]
