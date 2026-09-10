@@ -41,6 +41,9 @@ atari = [
 classic = [
     "gymnasium[classic-control]>=1.2.1,<2.0.0",
 ]
+mujoco = [
+    "gymnasium[mujoco]>=1.2.1,<2.0.0",
+]
 d4rl = [
     "cython<3",
     "d4rl>=1.1,<2.0.0",

@@ -128,6 +128,7 @@ class TestDeclaredContract:
             ("plugrl_env_client.envs.d4rl.d4rl_env", "D4RLEnv"),
             ("plugrl_env_client.envs.libero.libero_env", "LiberoEnv"),
             ("plugrl_env_client.envs.robomimic.robomimic_env", "RobomimicEnv"),
+            ("plugrl_env_client.envs.mujoco.mujoco_env", "MuJoCoEnv"),
         ],
     )
     def test_no_env_overrides_the_mode(self, module_name, class_name):

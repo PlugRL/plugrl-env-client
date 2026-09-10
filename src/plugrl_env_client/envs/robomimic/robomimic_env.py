@@ -1,6 +1,23 @@
 import os
+import sys
 
-os.environ["MUJOCO_GL"] = "egl"
+# robosuite picks its OpenGL backend at import time, so this has to be set
+# before the imports below. Two things it must not do while doing that.
+#
+# It must not overwrite a choice the caller already made - someone running
+# with a display wants glfw, and this used to take that away from them.
+#
+# And it must not set a value that is wrong for the platform. `egl` exists
+# only on Linux; on Windows the valid values are wgl, glfw and osmesa, and
+# mujoco raises `RuntimeError: invalid value for environment variable
+# MUJOCO_GL: egl` the moment anything imports its rendering module. That
+# mattered more than it looks: `plugrl_env_client.envs` imports every
+# `*_env.py` it can find, so this line ran on every platform even when
+# robomimic itself was not installed, and the ImportError below - which is
+# caught and downgraded to a warning - left the broken value behind to
+# poison every other MuJoCo-based environment in the process.
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("MUJOCO_GL", "egl")
 import json
 import pathlib
 import numpy as np
