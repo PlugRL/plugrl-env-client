@@ -218,3 +218,64 @@ def test_best_reward_threshold_for_success_records_success():
     assert bool(np.asarray(terminated)[0]) is True
     assert bool(np.asarray(info["episode"]["s"], dtype=np.bool_)[0]) is True
     env.close()
+
+
+def test_runtime_max_episode_steps_overrides_registered_default():
+    uid = f"UnitTestEnvRuntimeHorizon-{uuid.uuid4()}"
+
+    @register_env_config(uid)
+    @dataclasses.dataclass
+    class Cfg(BaseEnvConfig):
+        pass
+
+    @register_env(uid, max_episode_steps=2000)
+    class Env(BaseEnv):
+        def __init__(
+            self,
+            config: Cfg,
+            num_envs: int = 1,
+            process_id: int | None = None,
+            total_processes: int | None = None,
+        ):
+            super().__init__(
+                config=config,
+                num_envs=num_envs,
+                process_id=process_id,
+                total_processes=total_processes,
+            )
+            self.action_space = gym.spaces.Box(
+                low=-1.0, high=1.0, shape=(1,), dtype=np.float32
+            )
+            self.observation_space = gym.spaces.Dict({})
+
+        def reset(self, *, seed: int | None = None, options: dict | None = None):
+            obs = Observation(images={}, states={}, text="")
+            return obs, {}
+
+        def step(self, actions):
+            del actions
+            obs = Observation(images={}, states={}, text="")
+            reward = np.array([0.0], dtype=np.float32)
+            terminated = np.array([False], dtype=np.bool_)
+            truncated = np.array([False], dtype=np.bool_)
+            return obs, reward, terminated, truncated, {}
+
+    env = gym.make_vec(
+        uid,
+        num_envs=1,
+        vectorization_mode="vector_entry_point",
+        config=Cfg(),
+        max_episode_steps=3,
+    )
+    env.reset()
+
+    for step_idx in range(3):
+        _, _, terminated, truncated, info = env.step(np.array([0.0], dtype=np.float32))
+        assert bool(np.asarray(terminated)[0]) is False
+        if step_idx < 2:
+            assert bool(np.asarray(truncated)[0]) is False
+        else:
+            assert bool(np.asarray(truncated)[0]) is True
+            assert bool(np.asarray(info["TimeLimit.truncated"])[0]) is True
+
+    env.close()
