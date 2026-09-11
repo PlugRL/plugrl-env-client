@@ -78,6 +78,7 @@ uv run plugrl-run-env-client <ENVIRONMENT_TYPE> [OPTIONS]
 | Type | Extra required | Description |
 | :--- | :--- | :--- |
 | **dummy-v1** | — | Dummy environment for protocol and connectivity tests |
+| **mujoco-v1** | `mujoco` | Gymnasium MuJoCo control, default `HalfCheetah-v5` |
 | **classic-v1** | `classic` | Classic control environments (e.g. CartPole) |
 | **atari-v1** | `atari` | Atari games via ALE |
 | **d4rl-v1** | `d4rl` | D4RL locomotion tasks |
@@ -85,6 +86,20 @@ uv run plugrl-run-env-client <ENVIRONMENT_TYPE> [OPTIONS]
 | **libero-v1** | `libero` | LIBERO manipulation benchmark |
 
 An environment whose extra is not installed reports which extra it needs.
+
+**`mujoco-v1` is the one to reach for first.** It is dense-reward continuous
+control that needs no assets, no display and no GPU, and its default task
+`HalfCheetah-v5` has a 17-dimensional observation and a 6-dimensional action
+- exactly `plugrl-server`'s `fpo-policy` defaults, so the pair runs with no
+configuration. It renders only with `--env.render`; a state-only policy never
+looks at the frames, and producing them costs more per step than the physics
+does.
+
+```bash
+uv sync --extra mujoco
+uv run plugrl-run-env-client mujoco-v1 --num-envs 1 --num-episodes 600 \
+    --runner.replan-steps 1 --runner.seed 0
+```
 
 ### Examples
 
