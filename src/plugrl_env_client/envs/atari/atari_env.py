@@ -71,6 +71,10 @@ class AtariEnv(BaseEnv):
         env = gym.wrappers.FrameStackObservation(env, 4)
         self.env = env
         self.game_name = config.name
+        # rollout() sizes its action plan from this before the first step,
+        # so an env without it cannot run at all.
+        self.single_action_space = env.action_space
+        self.action_space = env.action_space
 
     def prepare_obs(self, obs: np.ndarray) -> Observation:
         frames = {f"{i}": obs[i : i + 1, :, :, None] for i in range(obs.shape[0])}

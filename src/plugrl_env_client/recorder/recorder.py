@@ -64,6 +64,7 @@ class Recorder:
 
         self.completed_episodes = 0
         self.total_episode_count = 0
+        self._timing: dict[str, Any] | None = None
         self.metric_window = max(1, int(args.metric_window))
         self.return_window: deque[float] = deque(maxlen=self.metric_window)
         self.success_window: deque[float] = deque(maxlen=self.metric_window)
@@ -185,6 +186,14 @@ class Recorder:
                     episode_success=episode_success,
                 )
 
+    def record_timing(self, timing: Any) -> None:
+        """Attach a rollout's timing breakdown to the run summary.
+
+        Takes anything with an as_dict(); the recorder has no reason to know
+        what a RolloutTiming is.
+        """
+        self._timing = timing.as_dict() if timing is not None else None
+
     def close(self) -> None:
         if not self.should_write:
             return
@@ -203,6 +212,7 @@ class Recorder:
                 "metric_window": self.metric_window,
                 "mean_return": self._mean_return(),
                 "mean_success_rate": self._mean_success_rate(),
+                "timing": self._timing,
             },
         )
 

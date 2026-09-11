@@ -1,0 +1,15 @@
+PlugRL
+Copyright 2026 The PlugRL Authors
+
+This product includes software adapted from Stable-Baselines3
+(https://github.com/DLR-RM/stable-baselines3), Copyright (c) 2019-2023
+Antonin Raffin, Ashley Hill, Anssi Kanervisto, Maximilian Ernestus,
+Rinu Boney, Pavan Goli and other contributors, licensed under the MIT
+License.
+
+  src/plugrl_env_client/envs/atari/atari_wrappers.py is adapted from
+  stable_baselines3/common/atari_wrappers.py and retains the MIT licence
+  text in its header.
+
+The wire format this client speaks is openpi's, byte for byte, and is
+attributed in plugrl-protocol's NOTICE.

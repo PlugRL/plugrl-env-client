@@ -842,6 +842,11 @@ atari = [
 classic-control = [
     { name = "pygame" },
 ]
+mujoco = [
+    { name = "imageio" },
+    { name = "mujoco" },
+    { name = "packaging" },
+]
 
 [[package]]
 name = "gymnasium-robotics"
@@ -2262,6 +2267,9 @@ d4rl = [
 libero = [
     { name = "libero" },
 ]
+mujoco = [
+    { name = "gymnasium", extra = ["mujoco"] },
+]
 robomimic = [
     { name = "cython" },
     { name = "d4rl" },
@@ -2289,6 +2297,7 @@ requires-dist = [
     { name = "gymnasium", specifier = ">=1.2.0,<2.0.0" },
     { name = "gymnasium", extras = ["atari"], marker = "extra == 'atari'", specifier = ">=1.2.1,<2.0.0" },
     { name = "gymnasium", extras = ["classic-control"], marker = "extra == 'classic'", specifier = ">=1.2.1,<2.0.0" },
+    { name = "gymnasium", extras = ["mujoco"], marker = "extra == 'mujoco'", specifier = ">=1.2.1,<2.0.0" },
     { name = "gymnasium-robotics", extras = ["mujoco-py"], marker = "extra == 'd4rl'", specifier = ">=1.4.1,<2.0.0" },
     { name = "imageio", extras = ["ffmpeg"], specifier = ">=2.37.2,<3.0.0" },
     { name = "libero", marker = "extra == 'libero'", git = "https://github.com/CTP314/LIBERO.git?rev=f3bf9428c0d7113b0b72d1462d9552fca35fcf92" },
@@ -2297,14 +2306,14 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3.3,<3.0.0" },
     { name = "patchelf", marker = "extra == 'd4rl'", specifier = ">=0.17.2.4,<0.18.0" },
     { name = "patchelf", marker = "extra == 'robomimic'", specifier = ">=0.17.2.4,<0.18.0" },
-    { name = "plugrl-protocol", git = "https://github.com/PlugRL/plugrl-protocol.git" },
+    { name = "plugrl-protocol", git = "https://github.com/PlugRL/plugrl-protocol.git?rev=840296ecbe39dddc6fb9f3ac92479decac0797bd" },
     { name = "pyopengl", marker = "extra == 'robomimic'", specifier = "==3.1.4" },
     { name = "robomimic", marker = "extra == 'robomimic'", specifier = "==0.3.0" },
     { name = "robosuite", marker = "extra == 'robomimic'", specifier = "<1.5.0" },
     { name = "tyro", specifier = ">=0.9.31,<0.10.0" },
     { name = "websockets", specifier = ">=15.0.1,<16.0.0" },
 ]
-provides-extras = ["robomimic", "atari", "classic", "d4rl", "libero"]
+provides-extras = ["robomimic", "atari", "classic", "mujoco", "d4rl", "libero"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2316,7 +2325,7 @@ dev = [
 [[package]]
 name = "plugrl-protocol"
 version = "0.1.0"
-source = { git = "https://github.com/PlugRL/plugrl-protocol.git#c7961da3ca050717ad3a01721f00afa1ed29bf47" }
+source = { git = "https://github.com/PlugRL/plugrl-protocol.git?rev=840296ecbe39dddc6fb9f3ac92479decac0797bd#840296ecbe39dddc6fb9f3ac92479decac0797bd" }
 dependencies = [
     { name = "msgpack" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },

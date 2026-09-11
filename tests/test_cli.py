@@ -8,6 +8,7 @@ from typing import cast
 
 import gymnasium as gym
 import numpy as np
+import pytest
 
 from plugrl_env_client.recorder import Recorder, RecorderArgs
 from plugrl_env_client.recorder.writers import VideoArtifactWriter
@@ -179,6 +180,14 @@ def test_cli_main_passes_recorder_video_fps(monkeypatch, tmp_path):
 
 
 def test_cli_main_keeps_top_level_env_for_runtime(monkeypatch, tmp_path):
+    # The d4rl-v1 subcommand only exists once the env module registers itself,
+    # which needs the d4rl extra.
+    pytest.importorskip(
+        "plugrl_env_client.envs.d4rl.d4rl_env",
+        exc_type=ImportError,
+        reason="requires the d4rl extra",
+    )
+
     import plugrl_env_client.cli as cli
 
     called: dict[str, object] = {}

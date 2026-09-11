@@ -174,12 +174,13 @@ class LiberoEnv(BaseEnv):
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
     ) -> tuple[Observation, dict]:
+        self.seed_rngs(seed)
         if options is None:
             options = {}
 
         if "initial_state" not in options:
             if self.config.randomize_initial_state:
-                intial_states_idx = np.random.randint(len(self.initial_states))
+                intial_states_idx = self.np_random.integers(len(self.initial_states))
             else:
                 if self.process_id is not None and self.total_processes is not None:
                     process_id = self.process_id

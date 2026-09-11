@@ -1,9 +1,36 @@
+import importlib.util
 import os
+import sys
 
-os.environ["MUJOCO_GL"] = "egl"
+# robosuite picks its OpenGL backend when it is imported, so MUJOCO_GL has to
+# be set before the imports below - but only when those imports are actually
+# going to happen. Three things this must not do.
+#
+# It must not run at all when robomimic is absent. `plugrl_env_client.envs`
+# imports every `*_env.py` it can find and downgrades ImportError to a
+# warning, so an unconditional assignment here ran on every machine, for
+# everyone, and the caught ImportError left the value behind.
+#
+# It must not set a value that is wrong for the platform. `egl` exists only
+# on Linux; on Windows the legal values are wgl, glfw and osmesa, and mujoco
+# raises `RuntimeError: invalid value for environment variable MUJOCO_GL:
+# egl` as soon as anything imports its rendering module - so an environment
+# family that was not even installed was killing every other MuJoCo-based
+# environment in the process.
+#
+# And it must not overwrite a choice the caller already made: someone running
+# with a display wants glfw.
+if importlib.util.find_spec("robomimic") is None:
+    raise ImportError(
+        "Robomimic is not installed. Please install it with the 'robomimic' "
+        "extra, e.g. 'pip install plugrl-env-client[robomimic]'"
+    )
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("MUJOCO_GL", "egl")
 import json
 import pathlib
 import numpy as np
+import gymnasium as gym
 
 try:
     import robomimic  # type: ignore
@@ -91,6 +118,18 @@ class RobomimicEnv(BaseEnv):
         self.task = env_meta["env_name"]
         self.agentview_image_size = config.agentview_image_size
 
+        # rollout() sizes its action plan from this before the first step, so
+        # an env without it cannot run at all. Only shape and dtype are read;
+        # robosuite normalises actions to [-1, 1], and the bounds go unused
+        # either way.
+        self.single_action_space = gym.spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(int(env.action_dimension),),
+            dtype=np.float32,
+        )
+        self.action_space = self.single_action_space
+
     def prepare_obs(self, obs, agentview_image) -> Observation:
         images = {}
         for key in self.image_keys:
@@ -107,6 +146,18 @@ class RobomimicEnv(BaseEnv):
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
     ) -> tuple[Observation, dict]:
+        if seed is not None:
+            # Refusing is better than pretending. The robosuite simulation
+            # underneath carries randomness this wrapper does not reach, so
+            # accepting the seed would produce runs that look reproducible and
+            # are not - exactly the failure seeding exists to prevent. A sweep
+            # asking for seeds should fail on its first episode rather than
+            # after burning a hundred jobs.
+            raise NotImplementedError(
+                "robomimic-v1 cannot honour a seed yet: the robosuite "
+                "simulation underneath is not seeded by this wrapper. Either "
+                "run without --runner.seed, or seed the underlying env first."
+            )
         obs = self.env.reset()
         agentview_image = self._render_agentview_image()
         return self.prepare_obs(obs, agentview_image), {}

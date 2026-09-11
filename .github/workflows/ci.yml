@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # pre-commit builds its hook environments with a system interpreter,
+      # and .pre-commit-config pins default_language_version to python3.10.
+      # setup-uv provides no system python, so without this the hooks fail
+      # with "failed to find interpreter for python_spec='python3.10'".
+      #
+      # Note this disagrees with .python-version, which says 3.11. Worth
+      # reconciling, but CI should install what the config asks for rather
+      # than quietly pick a side.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Run pre-commit
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # No extras: the point of this package is that it installs without a
+      # deep learning stack, and the test suite asserts exactly that.
+      - name: Sync
+        run: uv sync --frozen
+
+      - name: Test
+        run: uv run pytest -q

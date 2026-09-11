@@ -5,6 +5,7 @@ from typing import Any, Dict, Annotated, TypeVar
 import numpy.typing as npt
 
 import numpy as np
+from gymnasium.utils import seeding
 from gymnasium.vector import VectorEnv, AutoresetMode
 
 DType = TypeVar("DType", bound=np.generic)
@@ -99,6 +100,16 @@ class BaseEnv(VectorEnv[Observation, Action, np.ndarray], abc.ABC):
         self.total_processes = total_processes
         self.num_envs = int(num_envs)
 
+    def seed_rngs(self, seed: int | None) -> None:
+        """Seed this env's generator. Call first thing in reset().
+
+        Draw randomness from `self.np_random` rather than the module-level
+        `np.random`, or the seed will have no effect: `np.random` is global
+        state that nothing here owns.
+        """
+        if seed is not None:
+            self._np_random, self._np_random_seed = seeding.np_random(seed)
+
     @abc.abstractmethod
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
@@ -109,6 +120,17 @@ class BaseEnv(VectorEnv[Observation, Action, np.ndarray], abc.ABC):
         self, actions: Action
     ) -> tuple[Observation, RewardArray, BoolArray, BoolArray, dict]: ...
 
-    def fake_action(self) -> Action: ...
+    # Not abstract, because most envs have no use for them - but the bodies
+    # raise rather than return None. Returning None sends the failure to
+    # whoever eventually indexes the result, which is a long way from the
+    # class that did not implement it.
+    def fake_action(self) -> Action:
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement fake_action(). Sample "
+            "from self.action_space instead, or implement it."
+        )
 
-    def fake_obs(self) -> Observation: ...
+    def fake_obs(self) -> Observation:
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement fake_obs()."
+        )
