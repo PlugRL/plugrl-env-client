@@ -211,6 +211,18 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
         env_indices: Any,
         step_ids: Any,
     ) -> None:
+        """Send one transition, and drop it rather than resend it after a drop.
+
+        Feedback completes a transition the server began when it answered the
+        matching infer, and everything it needs to complete it - the previous
+        observation, the policy step state, the done flags - lives on that one
+        connection. Resending on a new connection does not save the step; it
+        makes the server build a transition out of an empty observation and
+        store it, with nothing downstream able to tell. SPEC section 7.6.
+
+        So a closed connection here costs exactly one transition, and that is
+        the cheap outcome. The next infer reconnects and resyncs.
+        """
         while True:
             self._ensure_connection()
             ws = self._ws
@@ -258,17 +270,18 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
                     return
 
                 logger.warning(
-                    "Connection closed normally during FEEDBACK send. "
-                    f"Waiting for server to come back and retrying... code={close_code}, "
-                    f"reason={close_reason or '<empty>'}"
+                    "Connection closed during FEEDBACK send. Dropping this "
+                    "transition and resuming from the next infer request. "
+                    f"code={close_code}, reason={close_reason or '<empty>'}"
                 )
-                continue
+                return
             except ConnectionClosedError as exc:
                 logger.warning(
-                    f"Connection closed during FEEDBACK send. Error: {exc}. Retrying..."
+                    "Connection closed during FEEDBACK send. Dropping this "
+                    f"transition and resuming from the next infer request. {exc}"
                 )
                 self._close_connection()
-                continue
+                return
             except Exception:
                 self._close_connection()
                 raise
