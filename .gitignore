@@ -17,3 +17,7 @@ runs
 # a server started from this directory writes here
 checkpoints
 .codex
+
+# MuJoCo writes this next to wherever it was started; it is a runtime log,
+# not source. A 2676-line copy from December 2025 was committed once.
+MUJOCO_LOG.TXT
