@@ -272,20 +272,24 @@ def test_rollout_infer_feedback_and_partial_reset_semantics():
     rollout(
         cast(gym.vector.VectorEnv, env),
         cast(WebSocketEnvClientAgent, agent),
-        num_episodes=1,
+        # Two episodes, so the loop continues past the first one and the
+        # partial reset this test is about actually happens. With one
+        # episode the run is already over when env 0 terminates, and
+        # rollout deliberately does not reset on the way out.
+        num_episodes=2,
         replan_steps=1,
         num_envs=num_envs,
     )
 
-    assert len(agent.infer_calls) == 1
+    assert len(agent.infer_calls) == 2
     np.testing.assert_array_equal(agent.infer_calls[0], np.asarray([0, 1]))
 
-    assert len(env.step_calls) == 1
+    assert len(env.step_calls) == 2
     np.testing.assert_array_equal(
         env.step_calls[0], np.zeros((num_envs, action_dim), dtype=np.float32)
     )
 
-    assert len(agent.feedback_calls) == 1
+    assert len(agent.feedback_calls) == 2
     fb = agent.feedback_calls[0]
     np.testing.assert_array_equal(fb["env_indices"], np.asarray([0, 1]))
     np.testing.assert_allclose(fb["rewards"], np.asarray([1.0, 2.0], dtype=np.float32))
