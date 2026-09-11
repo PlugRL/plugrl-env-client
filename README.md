@@ -42,14 +42,22 @@ The easiest way to get started is by cloning the repository and using `uv` to ma
 
 3. **Install Optional Environment Dependencies**
 
-    With `uv`:
+    Most people want `mujoco` and nothing else - it is the environment the
+    quickstart uses, and the only one here that is dense-reward continuous
+    control needing no assets, no display and no GPU:
 
     ```bash
-    uv sync --extra robomimic --extra atari --extra classic --extra libero
+    uv sync --extra mujoco
+    ```
+
+    Everything, with `uv`:
+
+    ```bash
+    uv sync --extra mujoco --extra robomimic --extra atari --extra classic --extra libero
     ```
 
     ```
-    pip install -e ".[robomimic, atari, classic, libero]"
+    pip install -e ".[mujoco, robomimic, atari, classic, libero]"
     ```
 
     Note: `robomimic` and `libero` pull in `egl-probe`, whose legacy CMake build
