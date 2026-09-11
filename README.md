@@ -22,7 +22,7 @@ The easiest way to get started is by cloning the repository and using `uv` to ma
 1.  **Clone the repository:**
 
     ```bash
-    git clone git@github.com:PlugRL/plugrl-env-client.git
+    git clone https://github.com/PlugRL/plugrl-env-client.git
     cd plugrl-env-client
     ```
 
