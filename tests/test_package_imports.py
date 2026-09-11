@@ -26,6 +26,7 @@ OPTIONAL_ENV_MODULES = {
     "plugrl_env_client.envs.classic.classic_env": "classic",
     "plugrl_env_client.envs.d4rl.d4rl_env": "d4rl",
     "plugrl_env_client.envs.libero.libero_env": "libero",
+    "plugrl_env_client.envs.mujoco.mujoco_env": "mujoco",
     "plugrl_env_client.envs.robomimic.robomimic_env": "robomimic",
 }
 

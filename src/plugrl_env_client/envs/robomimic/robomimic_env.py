@@ -1,21 +1,30 @@
+import importlib.util
 import os
 import sys
 
-# robosuite picks its OpenGL backend at import time, so this has to be set
-# before the imports below. Two things it must not do while doing that.
+# robosuite picks its OpenGL backend when it is imported, so MUJOCO_GL has to
+# be set before the imports below - but only when those imports are actually
+# going to happen. Three things this must not do.
 #
-# It must not overwrite a choice the caller already made - someone running
-# with a display wants glfw, and this used to take that away from them.
+# It must not run at all when robomimic is absent. `plugrl_env_client.envs`
+# imports every `*_env.py` it can find and downgrades ImportError to a
+# warning, so an unconditional assignment here ran on every machine, for
+# everyone, and the caught ImportError left the value behind.
 #
-# And it must not set a value that is wrong for the platform. `egl` exists
-# only on Linux; on Windows the valid values are wgl, glfw and osmesa, and
-# mujoco raises `RuntimeError: invalid value for environment variable
-# MUJOCO_GL: egl` the moment anything imports its rendering module. That
-# mattered more than it looks: `plugrl_env_client.envs` imports every
-# `*_env.py` it can find, so this line ran on every platform even when
-# robomimic itself was not installed, and the ImportError below - which is
-# caught and downgraded to a warning - left the broken value behind to
-# poison every other MuJoCo-based environment in the process.
+# It must not set a value that is wrong for the platform. `egl` exists only
+# on Linux; on Windows the legal values are wgl, glfw and osmesa, and mujoco
+# raises `RuntimeError: invalid value for environment variable MUJOCO_GL:
+# egl` as soon as anything imports its rendering module - so an environment
+# family that was not even installed was killing every other MuJoCo-based
+# environment in the process.
+#
+# And it must not overwrite a choice the caller already made: someone running
+# with a display wants glfw.
+if importlib.util.find_spec("robomimic") is None:
+    raise ImportError(
+        "Robomimic is not installed. Please install it with the 'robomimic' "
+        "extra, e.g. 'pip install plugrl-env-client[robomimic]'"
+    )
 if sys.platform.startswith("linux"):
     os.environ.setdefault("MUJOCO_GL", "egl")
 import json

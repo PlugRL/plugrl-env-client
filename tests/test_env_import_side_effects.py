@@ -16,6 +16,7 @@ These run in a subprocess: by the time a normal test runs, the package has
 already been imported and the side effect has already happened.
 """
 
+import importlib.util
 import os
 import subprocess
 import sys
@@ -43,13 +44,23 @@ def _import_envs_and_report(expression):
 
 
 def test_importing_the_package_does_not_choose_a_gl_backend_for_the_caller():
-    """Nothing gets to set MUJOCO_GL just because the package was imported."""
+    """An env family that is not installed must not set MUJOCO_GL.
+
+    robomimic legitimately needs a backend chosen before robosuite is
+    imported, so when robomimic IS installed a value here is correct. What is
+    not correct - and what used to happen - is setting one on a machine that
+    has no robomimic at all, purely because the package import walks every
+    `*_env.py` and swallows the resulting ImportError.
+    """
+    if importlib.util.find_spec("robomimic") is not None:
+        pytest.skip("robomimic is installed, so setting a backend is correct")
+
     value = _import_envs_and_report("__import__('os').environ.get('MUJOCO_GL')")
 
     assert value == "None", (
-        f"importing plugrl_env_client.envs set MUJOCO_GL={value}; an env module "
-        "that may not even be installed must not pick a rendering backend for "
-        "the whole process"
+        f"importing plugrl_env_client.envs set MUJOCO_GL={value} on a machine "
+        "with no robomimic; an env module that is not installed must not pick "
+        "a rendering backend for the whole process"
     )
 
 
