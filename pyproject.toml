@@ -3,7 +3,8 @@ name = "plugrl-env-client"
 version = "0.1.0"
 description = "PlugRL environment client: runs Gymnasium environments and speaks the PlugRL wire protocol."
 authors = [
-    {name = "chenhao lu",email = "luch21@mails.tsinghua.edu.cn"}
+    {name = "chenhao lu",email = "luch21@mails.tsinghua.edu.cn"},
+    {name = "Zuo Gou"}
 ]
 readme = "README.md"
 license = "Apache-2.0"
