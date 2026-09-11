@@ -45,7 +45,11 @@ def _core_module_names():
 
 @pytest.mark.parametrize("module_name", _core_module_names())
 def test_core_modules_import_on_a_bare_install(module_name):
-    importlib.import_module(module_name)
+    module = importlib.import_module(module_name)
+
+    # The import not raising is the whole test, but saying so out loud keeps
+    # it from reading as an empty test body that someone later deletes.
+    assert module.__name__ == module_name
 
 
 @pytest.mark.parametrize("module_name,extra", sorted(OPTIONAL_ENV_MODULES.items()))
