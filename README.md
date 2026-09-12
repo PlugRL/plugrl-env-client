@@ -135,12 +135,18 @@ uv run plugrl-run-env-client mujoco-v1 --num-envs 1 --num-episodes 600 \
 Run the `dummy-v1` environment with custom parameters:
 
 ```bash
-# Run 100 episodes with 'debug' logging level
-uv run plugrl-run-env-client dummy-v1 --num-episodes 100 --log-level debug
+# Run 100 episodes
+uv run plugrl-run-env-client dummy-v1 --num-episodes 100
 
 # Run with custom environment settings (64x64 image, 4-dim action space)
 uv run plugrl-run-env-client dummy-v1 --env.img-width 64 --env.img-height 64 --env.action-dim 4
 ```
+
+This example used to carry `--log-level debug`, which the env client has never
+had - the flag exists on `plugrl-run-server`, and the line was copied from
+there. There is no verbosity flag on this side. `tests/test_documented_commands.py`
+now runs every command on this page through the parser, which is how that was
+found.
 
 ### Get More Help
 
