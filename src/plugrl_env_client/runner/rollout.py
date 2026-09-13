@@ -111,120 +111,128 @@ def rollout(
         )
 
     finished_episodes = 0
-    while finished_episodes < num_episodes:
-        need_infer = np.nonzero(plan_pos >= plan_len)[0]
-        if need_infer.size:
-            infer_obs_pack_started_at = time.perf_counter()
-            obs_msg = dataclasses.asdict(_select_obs(obs, need_infer))
-            timing.infer_obs_pack += time.perf_counter() - infer_obs_pack_started_at
+    # The loop also ends when the server says it is done, which raises
+    # ServerStopped out of an agent call. That is the happy path - the
+    # algorithm took every step it was asked for - and it used to skip the
+    # summary below, so a run that finished normally reported no timings at
+    # all and left nothing to reconcile the client's step count against the
+    # server's. The summary belongs to the rollout either way.
+    try:
+        while finished_episodes < num_episodes:
+            need_infer = np.nonzero(plan_pos >= plan_len)[0]
+            if need_infer.size:
+                infer_obs_pack_started_at = time.perf_counter()
+                obs_msg = dataclasses.asdict(_select_obs(obs, need_infer))
+                timing.infer_obs_pack += time.perf_counter() - infer_obs_pack_started_at
 
-            infer_wait_started_at = time.perf_counter()
-            action_chunk = agent.infer(
-                obs_msg,
-                env_indices=need_infer,
-                step_ids=step_id[need_infer],
-            )["action"]
-            timing.infer_wait += time.perf_counter() - infer_wait_started_at
-            timing.infer_calls += 1
+                infer_wait_started_at = time.perf_counter()
+                action_chunk = agent.infer(
+                    obs_msg,
+                    env_indices=need_infer,
+                    step_ids=step_id[need_infer],
+                )["action"]
+                timing.infer_wait += time.perf_counter() - infer_wait_started_at
+                timing.infer_calls += 1
 
-            steps = replan_steps or len(action_chunk)
-            if len(action_chunk) < steps:
-                raise ValueError(
-                    f"replan_steps={replan_steps} exceeds predicted steps={len(action_chunk)}"
-                )
+                steps = replan_steps or len(action_chunk)
+                if len(action_chunk) < steps:
+                    raise ValueError(
+                        f"replan_steps={replan_steps} exceeds predicted steps={len(action_chunk)}"
+                    )
 
-            a = np.asarray(action_chunk[:steps], dtype=expected_action_dtype)
-            if a.shape[:2] != (steps, need_infer.size):
-                raise ValueError(
-                    f"Expected action shape ({steps}, {need_infer.size}, da), got {a.shape}"
-                )
-            if a.shape[2:] != expected_action_shape:
-                raise ValueError(
-                    f"Expected action shape tail {expected_action_shape}, got {a.shape[2:]}"
-                )
+                a = np.asarray(action_chunk[:steps], dtype=expected_action_dtype)
+                if a.shape[:2] != (steps, need_infer.size):
+                    raise ValueError(
+                        f"Expected action shape ({steps}, {need_infer.size}, da), got {a.shape}"
+                    )
+                if a.shape[2:] != expected_action_shape:
+                    raise ValueError(
+                        f"Expected action shape tail {expected_action_shape}, got {a.shape[2:]}"
+                    )
 
-            need_capacity = max(int(action_plan.shape[1]), int(steps))
-            need_shape = (num_envs, need_capacity) + expected_action_shape
-            if action_plan.shape != need_shape:
-                new_plan = np.empty(need_shape, dtype=expected_action_dtype)
-                cap = min(int(action_plan.shape[1]), need_capacity)
-                if cap:
-                    new_plan[:, :cap, ...] = action_plan[:, :cap, ...]
-                action_plan = new_plan
+                need_capacity = max(int(action_plan.shape[1]), int(steps))
+                need_shape = (num_envs, need_capacity) + expected_action_shape
+                if action_plan.shape != need_shape:
+                    new_plan = np.empty(need_shape, dtype=expected_action_dtype)
+                    cap = min(int(action_plan.shape[1]), need_capacity)
+                    if cap:
+                        new_plan[:, :cap, ...] = action_plan[:, :cap, ...]
+                    action_plan = new_plan
 
-            action_plan[need_infer, :steps, ...] = a.swapaxes(0, 1)
-            plan_pos[need_infer] = 0
-            plan_len[need_infer] = steps
+                action_plan[need_infer, :steps, ...] = a.swapaxes(0, 1)
+                plan_pos[need_infer] = 0
+                plan_len[need_infer] = steps
 
-        if np.any(plan_pos >= plan_len):
-            raise RuntimeError("Action plan is not ready for all envs")
+            if np.any(plan_pos >= plan_len):
+                raise RuntimeError("Action plan is not ready for all envs")
 
-        actions = action_plan[np.arange(num_envs), plan_pos]
-        env_step_started_at = time.perf_counter()
-        obs, reward, terminated, truncated, info = env.step(actions)
-        timing.env_step += time.perf_counter() - env_step_started_at
-        timing.env_steps += num_envs
-        if recorder is not None:
-            recorder.on_step(obs, reward, terminated, truncated, info)
-
-        plan_pos += 1
-
-        reward = np.asarray(reward, dtype=np.float32)
-        terminated = np.asarray(terminated, dtype=np.bool_)
-        truncated = np.asarray(truncated, dtype=np.bool_)
-        done = np.logical_or(terminated, truncated)
-
-        chunk_reward += reward
-
-        done_indices = np.nonzero(done)[0]
-        if done_indices.size:
-            plan_pos[done_indices] = plan_len[done_indices]
-
-        feedback_indices = np.nonzero(plan_pos >= plan_len)[0]
-        if feedback_indices.size:
-            feedback_started_at = time.perf_counter()
-            feedback_obs_pack_started_at = time.perf_counter()
-            feedback_obs = dataclasses.asdict(_select_obs(obs, feedback_indices))
-            timing.feedback_obs_pack += (
-                time.perf_counter() - feedback_obs_pack_started_at
-            )
-            feedback_info_pack_started_at = time.perf_counter()
-            feedback_info = _select_info(info, feedback_indices, num_envs=num_envs)
-            timing.feedback_info_pack += (
-                time.perf_counter() - feedback_info_pack_started_at
-            )
-            agent.feedback(
-                obs=feedback_obs,
-                rewards=chunk_reward[feedback_indices],
-                terminated=terminated[feedback_indices],
-                truncated=truncated[feedback_indices],
-                info=feedback_info,
-                env_indices=feedback_indices,
-                step_ids=step_id[feedback_indices],
-            )
-            timing.feedback += time.perf_counter() - feedback_started_at
-            timing.feedback_calls += 1
-            chunk_reward[feedback_indices] = 0.0
-            step_id[feedback_indices] += 1
-
-        if done_indices.size:
+            actions = action_plan[np.arange(num_envs), plan_pos]
+            env_step_started_at = time.perf_counter()
+            obs, reward, terminated, truncated, info = env.step(actions)
+            timing.env_step += time.perf_counter() - env_step_started_at
+            timing.env_steps += num_envs
             if recorder is not None:
-                recorder.on_episode_done(done_indices, obs, info)
-            finished_episodes += done_indices.size
-            # Only reset if the loop is going to use what comes back. A reset
-            # after the last episode costs a simulator a wasted rollout, and
-            # costs a real robot a pointless move back to its home pose - for
-            # an observation nothing will ever read.
-            if finished_episodes < num_episodes:
-                obs, info = env.reset(options={"reset_indices": done_indices})
-                if recorder is not None:
-                    recorder.on_reset(obs, info, reset_indices=done_indices)
-                step_id[done_indices] = 0
-        now = time.perf_counter()
-        if now - last_timing_log_at >= 30.0:
-            log_timing_summary(final=False)
-            last_timing_log_at = now
+                recorder.on_step(obs, reward, terminated, truncated, info)
 
-    log_timing_summary(final=True)
-    if recorder is not None:
-        recorder.record_timing(timing)
+            plan_pos += 1
+
+            reward = np.asarray(reward, dtype=np.float32)
+            terminated = np.asarray(terminated, dtype=np.bool_)
+            truncated = np.asarray(truncated, dtype=np.bool_)
+            done = np.logical_or(terminated, truncated)
+
+            chunk_reward += reward
+
+            done_indices = np.nonzero(done)[0]
+            if done_indices.size:
+                plan_pos[done_indices] = plan_len[done_indices]
+
+            feedback_indices = np.nonzero(plan_pos >= plan_len)[0]
+            if feedback_indices.size:
+                feedback_started_at = time.perf_counter()
+                feedback_obs_pack_started_at = time.perf_counter()
+                feedback_obs = dataclasses.asdict(_select_obs(obs, feedback_indices))
+                timing.feedback_obs_pack += (
+                    time.perf_counter() - feedback_obs_pack_started_at
+                )
+                feedback_info_pack_started_at = time.perf_counter()
+                feedback_info = _select_info(info, feedback_indices, num_envs=num_envs)
+                timing.feedback_info_pack += (
+                    time.perf_counter() - feedback_info_pack_started_at
+                )
+                agent.feedback(
+                    obs=feedback_obs,
+                    rewards=chunk_reward[feedback_indices],
+                    terminated=terminated[feedback_indices],
+                    truncated=truncated[feedback_indices],
+                    info=feedback_info,
+                    env_indices=feedback_indices,
+                    step_ids=step_id[feedback_indices],
+                )
+                timing.feedback += time.perf_counter() - feedback_started_at
+                timing.feedback_calls += 1
+                chunk_reward[feedback_indices] = 0.0
+                step_id[feedback_indices] += 1
+
+            if done_indices.size:
+                if recorder is not None:
+                    recorder.on_episode_done(done_indices, obs, info)
+                finished_episodes += done_indices.size
+                # Only reset if the loop is going to use what comes back. A reset
+                # after the last episode costs a simulator a wasted rollout, and
+                # costs a real robot a pointless move back to its home pose - for
+                # an observation nothing will ever read.
+                if finished_episodes < num_episodes:
+                    obs, info = env.reset(options={"reset_indices": done_indices})
+                    if recorder is not None:
+                        recorder.on_reset(obs, info, reset_indices=done_indices)
+                    step_id[done_indices] = 0
+            now = time.perf_counter()
+            if now - last_timing_log_at >= 30.0:
+                log_timing_summary(final=False)
+                last_timing_log_at = now
+
+    finally:
+        log_timing_summary(final=True)
+        if recorder is not None:
+            recorder.record_timing(timing)
