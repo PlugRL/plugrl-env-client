@@ -207,7 +207,9 @@ class RobomimicEnv(BaseEnv):
         succeeded = self.terminate_on_success and bool(self.env.is_success()["task"])
         ended = bool(done) or succeeded
         terminated = np.array([ended], dtype=np.bool_)
-        truncated = np.array([not ended and self._steps >= self.horizon], dtype=np.bool_)
+        truncated = np.array(
+            [not ended and self._steps >= self.horizon], dtype=np.bool_
+        )
         return (
             self.prepare_obs(obs, agentview_image),
             reward,

@@ -128,7 +128,11 @@ def test_reset_restarts_the_count(make_env):
 
     env.reset()
 
-    assert [_step(env) for _ in range(3)] == [(False, False), (False, False), (False, True)]
+    assert [_step(env) for _ in range(3)] == [
+        (False, False),
+        (False, False),
+        (False, True),
+    ]
 
 
 def test_a_task_with_no_known_horizon_needs_one(make_env, monkeypatch):
