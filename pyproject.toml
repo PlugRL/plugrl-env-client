@@ -27,12 +27,17 @@ plugrl-run-env-client = "plugrl_env_client.cli:main"
 plugrl-run-worker = "plugrl_env_client.cli:main"
 
 [project.optional-dependencies]
+# robomimic 0.3.0, the last on PyPI, imports mujoco_py in env_robosuite, and
+# mujoco_py needs MuJoCo 2.1 binaries and system GL headers; v0.4.0 does not,
+# and supports robosuite 1.2 onwards. robosuite 1.4.1 with mujoco 2.3.7
+# matches the environment metadata shipped in envs/robomimic/env_meta, and
+# mujoco 3.x trips robosuite 1.4.1's joint-type assertion - so this extra and
+# `mujoco` (gymnasium's MuJoCo 3) belong in separate environments. robomimic's
+# dependency egl-probe builds with CMake: `pip install cmake` first.
 robomimic = [
-    "cython<3",
-    "d4rl>=1.1,<2.0.0",
-    "patchelf>=0.17.2.4,<0.18.0",
-    "robomimic==0.3.0",
-    "robosuite<1.5.0",
+    "robomimic @ git+https://github.com/ARISE-Initiative/robomimic.git@v0.4.0",
+    "robosuite==1.4.1",
+    "mujoco==2.3.7",
     "PyOpenGL==3.1.4",
 ]
 atari = [
