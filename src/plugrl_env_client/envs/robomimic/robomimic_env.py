@@ -37,9 +37,12 @@ try:
     import robomimic.envs.env_robosuite  # type: ignore
     import robomimic.utils.env_utils as _env_utils  # type: ignore
     import robomimic.utils.obs_utils as _obs_utils  # type: ignore
-except ImportError:
+except ImportError as e:
+    # Say what failed. "Not installed" was the message when robomimic was
+    # installed and its own import of mujoco_py was what failed.
     raise ImportError(
-        "Robomimic is not installed. Please install it with the 'robomimic' extra, e.g. 'pip install plugrl-env-client[robomimic]'"
+        f"Could not import robomimic ({e}). Install it with the 'robomimic' "
+        "extra, e.g. 'pip install plugrl-env-client[robomimic]'"
     )
 except Exception as e:
     raise ImportError(f"An error occurred while importing robomimic: {e}")
@@ -49,6 +52,18 @@ from plugrl_env_client.utils.registration import register_env, register_env_conf
 
 UID = "Robomimic-v1"
 ENV_META_DIR = pathlib.Path(__file__).parent / "env_meta"
+
+# robomimic's environments never end an episode themselves: the dataset
+# metadata sets ignore_done and EnvRobosuite.is_done() is never true.
+# robomimic's own rollouts stop on success or at these horizons, the ones its
+# paper configs use per task.
+_ROLLOUT_HORIZONS = {
+    "Lift": 400,
+    "PickPlaceCan": 400,
+    "NutAssemblySquare": 400,
+    "ToolHang": 700,
+    "TwoArmTransport": 700,
+}
 
 
 @register_env_config(UID)
@@ -64,6 +79,11 @@ class RobomimicConfig(BaseEnvConfig):
         ]
     )
     agentview_image_size: tuple[int, int] = (720, 1280)
+    # Steps before an episode is truncated. None takes robomimic's rollout
+    # horizon for the task; a task without one must set it.
+    horizon: int | None = None
+    # End the episode, as terminated, on the step the task succeeds.
+    terminate_on_success: bool = True
 
 
 @register_env(UID, best_reward_threshold_for_success=1.0)
@@ -96,6 +116,18 @@ class RobomimicEnv(BaseEnv):
             raise ValueError(
                 f"Environment metadata file not found for env name: {config.name}"
             )
+
+        horizon = config.horizon
+        if horizon is None:
+            horizon = _ROLLOUT_HORIZONS.get(env_meta["env_name"])
+        if horizon is None:
+            raise ValueError(
+                f"No rollout horizon is known for {env_meta['env_name']}; set "
+                "--env.horizon, or its episodes will never end"
+            )
+        self.horizon = int(horizon)
+        self.terminate_on_success = config.terminate_on_success
+        self._steps = 0
 
         _obs_utils.initialize_obs_modality_mapping_from_dict(
             dict(
@@ -158,6 +190,7 @@ class RobomimicEnv(BaseEnv):
                 "simulation underneath is not seeded by this wrapper. Either "
                 "run without --runner.seed, or seed the underlying env first."
             )
+        self._steps = 0
         obs = self.env.reset()
         agentview_image = self._render_agentview_image()
         return self.prepare_obs(obs, agentview_image), {}
@@ -168,10 +201,15 @@ class RobomimicEnv(BaseEnv):
         assert actions.shape[0] == 1, "Batch size must be 1 for robomimic env"
         action = actions[0].tolist()
         obs, reward, done, info = self.env.step(action)
+        self._steps += 1
         agentview_image = self._render_agentview_image()
         reward = np.array([float(reward)], dtype=np.float32)
-        terminated = np.array([bool(done)], dtype=np.bool_)
-        truncated = np.array([False], dtype=np.bool_)
+        succeeded = self.terminate_on_success and bool(self.env.is_success()["task"])
+        ended = bool(done) or succeeded
+        terminated = np.array([ended], dtype=np.bool_)
+        truncated = np.array(
+            [not ended and self._steps >= self.horizon], dtype=np.bool_
+        )
         return (
             self.prepare_obs(obs, agentview_image),
             reward,
