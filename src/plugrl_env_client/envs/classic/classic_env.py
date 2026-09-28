@@ -1,3 +1,15 @@
+"""Gymnasium's classic-control environments as a PlugRL environment.
+
+Both kinds of action space work. A discrete one (CartPole-v1) takes the
+action as an integer; a continuous one (Pendulum-v1, MountainCarContinuous-v0)
+as a float array of the space's shape and dtype. This env used to cast every
+action to an integer, so the continuous tasks could not run at all.
+
+Rendering is off by default, as in the MuJoCo family: a state-only policy
+never reads the frames, and rendering every step costs more than the physics.
+Turn it on with `--env.render` when something downstream wants pixels.
+"""
+
 import dataclasses
 import importlib.util
 import numpy as np
@@ -18,6 +30,7 @@ UID = "Classic-v1"
 @dataclasses.dataclass
 class ClassicConfig(BaseEnvConfig):
     name: str = "CartPole-v1"
+    render: bool = False
 
 
 @register_env(UID)
@@ -39,17 +52,20 @@ class ClassicEnv(BaseEnv):
         )
         if self.num_envs != 1:
             raise ValueError("ClassicEnv only supports num_envs=1")
-        env = gym.make(config.name, render_mode="rgb_array")
+        self.render_frames = bool(config.render)
+        env = gym.make(config.name, render_mode="rgb_array" if self.render_frames else None)
         self.env = env
         self.game_name = config.name
+        self.discrete = isinstance(env.action_space, gym.spaces.Discrete)
         # rollout() sizes its action plan from this before the first step, so
         # an env without it cannot run at all.
         self.single_action_space = env.action_space
         self.action_space = env.action_space
 
     def prepare_obs(self, obs: np.ndarray) -> Observation:
-        frame = self.env.render()
-        frames = {"env": np.array(frame)[None, ...]}
+        frames = {}
+        if self.render_frames:
+            frames = {"env": np.array(self.env.render())[None, ...]}
         states = {"obs": obs[None, ...]}
         return Observation(
             images=frames,
@@ -66,7 +82,11 @@ class ClassicEnv(BaseEnv):
     def step(
         self, action: Action
     ) -> tuple[Observation | None, np.ndarray, np.ndarray, np.ndarray, dict]:
-        action = int(action.item())
+        if self.discrete:
+            action = int(np.asarray(action).item())
+        else:
+            space = self.env.action_space
+            action = np.asarray(action, dtype=space.dtype).reshape(space.shape)
         obs, reward, terminated, truncated, info = self.env.step(action)
         reward = np.array([float(reward)], dtype=np.float32)
         terminated = np.array([bool(terminated)], dtype=np.bool_)
