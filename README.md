@@ -61,24 +61,35 @@ The easiest way to get started is by cloning the repository and using `uv` to ma
     uv sync --extra mujoco
     ```
 
-    All six extras, with `uv`:
+    The six extras do not all go in one environment, because they need
+    different MuJoCo versions:
 
-    ```bash
-    uv sync --extra mujoco --extra robomimic --extra atari --extra classic --extra libero --extra d4rl
-    ```
+    - `mujoco`, `classic`, `atari` and `d4rl` share one, on gymnasium's
+      MuJoCo 3:
 
-    ```
-    pip install -e ".[mujoco, robomimic, atari, classic, libero, d4rl]"
-    ```
+      ```bash
+      uv sync --extra mujoco --extra classic --extra atari --extra d4rl
+      ```
 
-    Correction: these two lines were labelled "Everything" but listed only five
-    of the six extras `pyproject.toml` declares - `d4rl` was missing, while the
-    environment table below names it as the extra for `d4rl-v1`. Against the
-    committed `uv.lock`, all six resolve to 100 packages and the old five to 97
-    (`uv sync --frozen --dry-run`, uv 0.9.8): `robomimic` already carries `d4rl`
-    and `mujoco-py`, so the `d4rl` extra itself adds `gymnasium-robotics`,
-    `mujoco-py-cython3` and `pettingzoo`. Note that "all six" is not a light
-    install - E1 measures the env client with the `robomimic` extra at 7.2G with
+    - `robomimic` and `libero` each need robosuite 1.4.1 with MuJoCo 2.3.7,
+      which is what the LIBERO experiments ran on. Give each an environment
+      of its own, in a separate checkout:
+
+      ```bash
+      uv sync --extra robomimic   # or: uv sync --extra libero
+      ```
+
+    `pyproject.toml` declares `mujoco` in conflict with the other two, so `uv`
+    refuses to combine them rather than resolving one MuJoCo for both. With
+    `pip`, keep the two sets in separate virtual environments.
+
+    Correction: this section used to give one command for all six extras. It
+    could not produce a working environment: robosuite 1.4.1 rejects MuJoCo 3,
+    and the `mujoco` extra needs it. Neither was the lock resolving them
+    correctly. It still held robomimic 0.3.0 after the extra moved to 0.4.0,
+    and resolving it again would have put MuJoCo 2.3.7 under `mujoco` too.
+
+    The `robomimic` extra is not a light install. E1 measures it at 7.2G with
     16 CUDA wheels, because robomimic ships its own policy learning code.
 
     Note: `robomimic` and `libero` pull in `egl-probe`, whose legacy CMake build
