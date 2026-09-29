@@ -26,7 +26,9 @@ class TestContinuousActions:
         env.reset(seed=0)
         env.env.unwrapped.state = np.array([0.0, 0.0])
         # A torque of 1.5 from rest: an integer cast would have applied 1.0.
-        obs, reward, terminated, truncated, _ = env.step(np.array([1.5], dtype=np.float32))
+        obs, reward, terminated, truncated, _ = env.step(
+            np.array([1.5], dtype=np.float32)
+        )
         assert obs.states["obs"].shape == (1, 3)
         assert obs.states["obs"][0, 2] == pytest.approx(3.0 * 1.5 * 0.05, rel=1e-6)
         assert reward.shape == terminated.shape == truncated.shape == (1,)

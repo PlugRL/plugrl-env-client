@@ -53,7 +53,9 @@ class ClassicEnv(BaseEnv):
         if self.num_envs != 1:
             raise ValueError("ClassicEnv only supports num_envs=1")
         self.render_frames = bool(config.render)
-        env = gym.make(config.name, render_mode="rgb_array" if self.render_frames else None)
+        env = gym.make(
+            config.name, render_mode="rgb_array" if self.render_frames else None
+        )
         self.env = env
         self.game_name = config.name
         self.discrete = isinstance(env.action_space, gym.spaces.Discrete)
