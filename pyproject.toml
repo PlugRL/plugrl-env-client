@@ -18,8 +18,9 @@ dependencies = [
     "msgpack>=1.1.1,<2.0.0",
     "tyro>=0.9.31,<0.10.0",
     "plugrl-protocol @ git+https://github.com/PlugRL/plugrl-protocol.git@840296ecbe39dddc6fb9f3ac92479decac0797bd",
-    "pandas>=2.3.3,<3.0.0",
-    "imageio[ffmpeg]>=2.37.2,<3.0.0",
+    # The recorder's PNG snapshots. Its mp4 videos need ffmpeg: the `video`
+    # extra.
+    "imageio>=2.37.2,<3.0.0",
 ]
 
 [project.scripts]
@@ -27,6 +28,12 @@ plugrl-run-env-client = "plugrl_env_client.cli:main"
 plugrl-run-worker = "plugrl_env_client.cli:main"
 
 [project.optional-dependencies]
+# The recorder's videos (--recorder.record-video, --recorder.record-full-rollout).
+# imageio-ffmpeg carries its own ffmpeg binary, 77 MB of an install that
+# otherwise does not need it (E45).
+video = [
+    "imageio[ffmpeg]>=2.37.2,<3.0.0",
+]
 # robomimic 0.3.0, the last on PyPI, imports mujoco_py in env_robosuite, and
 # mujoco_py needs MuJoCo 2.1 binaries and system GL headers; v0.4.0 does not,
 # and supports robosuite 1.2 onwards. robosuite 1.4.1 with mujoco 2.3.7

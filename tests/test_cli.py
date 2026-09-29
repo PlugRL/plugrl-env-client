@@ -626,6 +626,9 @@ def test_video_artifact_writer_uses_configured_fps(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "plugrl_env_client.recorder.writers.imageio.get_writer", fake_get_writer
     )
+    monkeypatch.setattr(
+        "plugrl_env_client.recorder.writers._ffmpeg_available", lambda: True
+    )
     writer = VideoArtifactWriter(full_videos_dir=tmp_path / "full", video_fps=12)
     writer.write_episode_videos(
         images_dir=tmp_path / "sampled" / "images",
@@ -633,3 +636,17 @@ def test_video_artifact_writer_uses_configured_fps(monkeypatch, tmp_path):
     )
 
     assert calls == [(tmp_path / "sampled" / "images" / "cam.mp4", 12.0)]
+
+
+def test_a_video_without_ffmpeg_names_the_extra(monkeypatch, tmp_path):
+    """The base install leaves imageio-ffmpeg out; the error says what to add."""
+    monkeypatch.setattr(
+        "plugrl_env_client.recorder.writers._ffmpeg_available", lambda: False
+    )
+    writer = VideoArtifactWriter(full_videos_dir=tmp_path / "full", video_fps=12)
+
+    with pytest.raises(RuntimeError, match=r"`video` extra"):
+        writer.write_episode_videos(
+            images_dir=tmp_path / "sampled" / "images",
+            image_frames={"cam": [np.zeros((2, 2, 3), dtype=np.uint8)]},
+        )

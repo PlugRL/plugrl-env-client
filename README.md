@@ -8,17 +8,18 @@
 ## ✨ Features
 
   * **No deep learning dependencies**: The policy stays on the server. The base
-    install declares nine runtime dependencies - `gymnasium`, `websockets` and
+    install declares eight runtime dependencies - `gymnasium`, `websockets` and
     `msgpack` do the environment and wire work, next to `loguru`, `dm-tree`,
-    `tyro`, `plugrl-protocol`, `pandas` and `imageio[ffmpeg]` - and none of them
-    is a deep learning framework, so environments pinned to old `mujoco-py` or
-    `cython<3` can be used with a modern training stack. E1 measures that bare
-    install at 30 packages and 224M on Linux with no CUDA wheels
-    (`plugrl-server/experiments/e1-dependency-conflict/`, round 4). Correction:
-    this line previously said the client needs "only `gymnasium`, `websockets`
-    and `msgpack`", which named three of the nine declared dependencies.
-    `pandas` is declared but is not imported anywhere in `src/` today - it is
-    weight in the install, not a requirement of the runtime.
+    `tyro`, `plugrl-protocol` and `imageio` - and none of them is a deep
+    learning framework, so environments pinned to old `mujoco-py` or
+    `cython<3` can be used with a modern training stack. Recording videos
+    needs the `video` extra, which adds ffmpeg.
+    Correction: this line previously said the client needs "only `gymnasium`,
+    `websockets` and `msgpack`", which named three of the nine then declared.
+    Two of those nine have since left the base install. `pandas` was never
+    imported, and `imageio[ffmpeg]` became `imageio`, with ffmpeg moved to
+    `video`. E45 measured them at 45 MB and 77 MB of the 222 MB install
+    (`plugrl-server/experiments/e45-env-side-footprint/`).
   * **Distributed communication**: `websockets` plus `msgpack` for asynchronous transfer between the server and any number of env clients, across machines.
   * **Modular design**: Separates the environment-side runtime (`plugrl-env-client`) from the shared protocol layer (`plugrl-protocol`).
   * **Command-line interface**: A `tyro`-powered CLI for starting and managing env clients.
@@ -91,6 +92,10 @@ The easiest way to get started is by cloning the repository and using `uv` to ma
 
     The `robomimic` extra is not a light install. E1 measures it at 7.2G with
     16 CUDA wheels, because robomimic ships its own policy learning code.
+
+    `video` goes with any of them. The recorder needs it for mp4 output
+    (`--recorder.record-video`, `--recorder.record-full-rollout`); its PNG
+    snapshots need only the base install.
 
     Note: `robomimic` and `libero` pull in `egl-probe`, whose legacy CMake build
     needs `CMAKE_POLICY_VERSION_MINIMUM=3.5` when using CMake 4+. `uv` is

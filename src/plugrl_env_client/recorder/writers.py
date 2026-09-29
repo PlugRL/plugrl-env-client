@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,26 @@ from plugrl_env_client.utils.recorder import (
     to_builtin,
     write_json,
 )
+
+
+def _ffmpeg_available() -> bool:
+    return importlib.util.find_spec("imageio_ffmpeg") is not None
+
+
+def _video_writer(path: Path, *, fps: float):
+    """An mp4 writer, or an error that says which extra provides one.
+
+    The base install keeps imageio for the PNG snapshots and leaves out
+    imageio-ffmpeg, which carries its own 77 MB ffmpeg binary; videos need
+    the `video` extra.
+    """
+    if not _ffmpeg_available():
+        raise RuntimeError(
+            f"Writing {path.name} needs ffmpeg, which the base install leaves "
+            "out. Install the `video` extra: `uv sync --extra video`, or "
+            "`pip install 'plugrl-env-client[video]'`."
+        )
+    return imageio.get_writer(path, fps=fps)
 
 
 class ObservationArtifactWriter:
@@ -134,7 +155,7 @@ class VideoArtifactWriter:
                 continue
             path = images_dir / f"{key}.mp4"
             path.parent.mkdir(parents=True, exist_ok=True)
-            writer = imageio.get_writer(path, fps=self.video_fps)
+            writer = _video_writer(path, fps=self.video_fps)
             try:
                 for frame in frames:
                     writer.append_data(frame)
@@ -147,7 +168,7 @@ class VideoArtifactWriter:
             if writer is None:
                 path = self.full_videos_dir / f"{key}.mp4"
                 path.parent.mkdir(parents=True, exist_ok=True)
-                writer = imageio.get_writer(path, fps=self.video_fps)
+                writer = _video_writer(path, fps=self.video_fps)
                 self._full_video_writers[key] = writer
             frames = np.asarray(value)
             grid = make_grid(np.asarray([ensure_rgb(frame) for frame in frames]))
