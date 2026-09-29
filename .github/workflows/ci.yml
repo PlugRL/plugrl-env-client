@@ -41,6 +41,12 @@ jobs:
         with:
           enable-cache: true
 
+      # `--frozen` below installs from uv.lock without asking whether it still
+      # matches pyproject.toml. It did not, for a while: robomimic moved to
+      # 0.4.0 and the lock kept 0.3.0. This fails when the two disagree.
+      - name: Lock is current
+        run: uv lock --check
+
       # No extras: the point of this package is that it installs without a
       # deep learning stack, and the test suite asserts exactly that.
       - name: Sync
