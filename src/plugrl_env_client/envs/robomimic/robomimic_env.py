@@ -135,18 +135,25 @@ class RobomimicEnv(BaseEnv):
             )
         )
 
+        # The `-img` metadata names the cameras whose images go into the
+        # observation; the state-only metadata (`square`, `lift`, ...) names
+        # none. Reading the key unconditionally raised KeyError for every one
+        # of those, and turning image observations on without cameras would
+        # have robosuite add its default `agentview` image to the states. The
+        # agentview frame below is rendered either way.
+        camera_names = list(env_meta["env_kwargs"].get("camera_names", []))
         env = _env_utils.create_env_from_metadata(
             env_meta=env_meta,
             render=False,
             render_offscreen=True,
-            use_image_obs=True,
+            use_image_obs=bool(camera_names),
         )
         assert isinstance(env, robomimic.envs.env_robosuite.EnvRobosuite)
         self.env = env
 
         self.env.env.hard_reset = False
 
-        self.image_keys = env_meta["env_kwargs"]["camera_names"]
+        self.image_keys = camera_names
         self.task = env_meta["env_name"]
         self.agentview_image_size = config.agentview_image_size
 
