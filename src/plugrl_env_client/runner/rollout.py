@@ -5,7 +5,10 @@ import gymnasium as gym
 import numpy as np
 from loguru import logger
 
-from plugrl_env_client.agent.websocket_env_client_agent import WebSocketEnvClientAgent
+from plugrl_env_client.agent.websocket_env_client_agent import (
+    ConnectionReplaced,
+    WebSocketEnvClientAgent,
+)
 from plugrl_env_client.recorder import Recorder
 from plugrl_env_client.utils.rollout import _get_action_spec, _select_info, _select_obs
 
@@ -126,11 +129,19 @@ def rollout(
                 timing.infer_obs_pack += time.perf_counter() - infer_obs_pack_started_at
 
                 infer_wait_started_at = time.perf_counter()
-                action_chunk = agent.infer(
-                    obs_msg,
-                    env_indices=need_infer,
-                    step_ids=step_id[need_infer],
-                )["action"]
+                try:
+                    action_chunk = agent.infer(
+                        obs_msg,
+                        env_indices=need_infer,
+                        step_ids=step_id[need_infer],
+                    )["action"]
+                except ConnectionReplaced:
+                    # SPEC section 7.6: every chunk still in flight came from a
+                    # connection that is gone. Drop them all, so the next
+                    # infer re-plans every env on the new connection.
+                    plan_pos[:] = plan_len
+                    chunk_reward[:] = 0.0
+                    continue
                 timing.infer_wait += time.perf_counter() - infer_wait_started_at
                 timing.infer_calls += 1
 
@@ -187,6 +198,7 @@ def rollout(
             if done_indices.size:
                 plan_pos[done_indices] = plan_len[done_indices]
 
+            replaced = False
             feedback_indices = np.nonzero(plan_pos >= plan_len)[0]
             if feedback_indices.size:
                 feedback_started_at = time.perf_counter()
@@ -200,15 +212,20 @@ def rollout(
                 timing.feedback_info_pack += (
                     time.perf_counter() - feedback_info_pack_started_at
                 )
-                agent.feedback(
-                    obs=feedback_obs,
-                    rewards=chunk_reward[feedback_indices],
-                    terminated=terminated[feedback_indices],
-                    truncated=truncated[feedback_indices],
-                    info=feedback_info,
-                    env_indices=feedback_indices,
-                    step_ids=step_id[feedback_indices],
-                )
+                try:
+                    agent.feedback(
+                        obs=feedback_obs,
+                        rewards=chunk_reward[feedback_indices],
+                        terminated=terminated[feedback_indices],
+                        truncated=truncated[feedback_indices],
+                        info=feedback_info,
+                        env_indices=feedback_indices,
+                        step_ids=step_id[feedback_indices],
+                    )
+                except ConnectionReplaced:
+                    # Dropped, and so is every other chunk in flight. The
+                    # episodes that ended still ended: the reset below runs.
+                    replaced = True
                 timing.feedback += time.perf_counter() - feedback_started_at
                 timing.feedback_calls += 1
                 chunk_reward[feedback_indices] = 0.0
@@ -227,6 +244,9 @@ def rollout(
                     if recorder is not None:
                         recorder.on_reset(obs, info, reset_indices=done_indices)
                     step_id[done_indices] = 0
+            if replaced:
+                plan_pos[:] = plan_len
+                chunk_reward[:] = 0.0
             now = time.perf_counter()
             if now - last_timing_log_at >= 30.0:
                 log_timing_summary(final=False)

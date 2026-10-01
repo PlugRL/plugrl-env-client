@@ -31,6 +31,26 @@ class ServerStopped(RuntimeError):
     """Raised when the server explicitly requests env clients to stop."""
 
 
+class ConnectionReplaced(RuntimeError):
+    """The connection the caller's actions came from is gone.
+
+    The server keeps each environment's half of a transition - the previous
+    observation, the policy step state - on the connection that answered the
+    infer, so a new connection starts with none of it (SPEC section 7.6). Any
+    action chunk the caller is still executing was answered on the old one:
+    its feedback can never be completed, and must not be sent on the new
+    connection. The caller drops every chunk in flight and asks again for
+    all of its environments.
+
+    It used not to be told. The agent reconnected inside its next call and
+    carried on, so environments in the middle of a chunk kept executing it
+    and then sent its feedback on the new connection, and a feedback whose
+    send failed was followed by a reconnect inside the next `feedback` call,
+    whose first message was then a stale feedback. `plugrl-conformance
+    --probe --scenario resync` caught both.
+    """
+
+
 class WebSocketEnvClientAgent(_base_agent.BaseAgent):
     def __init__(
         self,
@@ -46,6 +66,11 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
         self._api_key = api_key
         self._reconnect_on_server_stop = reconnect_on_server_stop
         self._ws, self._server_metadata = self._wait_for_server()
+        # Which connection this is, and which one answered the caller's last
+        # infer. When they differ, the caller is holding actions from a
+        # connection that is gone; see ConnectionReplaced.
+        self._connection_id = 1
+        self._actions_from: int | None = None
 
     def _close_connection(self) -> None:
         if self._ws is None:
@@ -130,6 +155,12 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
             return
         logger.warning("Connection closed. Attempting to re-establish connection.")
         self._ws, self._server_metadata = self._wait_for_server()
+        self._connection_id += 1
+
+    def _replaced(self, why: str) -> ConnectionReplaced:
+        """Tell the caller once; its next infer then goes out as normal."""
+        self._actions_from = None
+        return ConnectionReplaced(why)
 
     def infer(
         self,
@@ -143,6 +174,15 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
             ws = self._ws
             if ws is None:
                 raise RuntimeError("WebSocket connection is not available.")
+            if (
+                self._actions_from is not None
+                and self._actions_from != self._connection_id
+            ):
+                # Nothing is sent: the caller has to re-plan every env first.
+                raise self._replaced(
+                    "The connection was replaced; the action chunks in flight "
+                    "came from the old one and are void."
+                )
 
             try:
                 packed_data = self._packer.pack(
@@ -159,6 +199,7 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
                 if isinstance(response, str):
                     raise RuntimeError(f"Error in inference server:\n{response}")
 
+                self._actions_from = self._connection_id
                 return msgpack_numpy.unpackb(response)["data"]
             except ConnectionClosedOK as exc:
                 close_code, close_reason = _get_close_details(exc)
@@ -220,71 +261,66 @@ class WebSocketEnvClientAgent(_base_agent.BaseAgent):
         makes the server build a transition out of an empty observation and
         store it, with nothing downstream able to tell. SPEC section 7.6.
 
-        So a closed connection here costs exactly one transition, and that is
-        the cheap outcome. The next infer reconnects and resyncs.
+        So a closed connection here costs the transitions in flight, and that
+        is the cheap outcome. This method never reconnects: a feedback is only
+        ever sent on the connection that answered its infer. When that
+        connection is gone it raises ConnectionReplaced, so the caller drops
+        every chunk it is still executing, and the next infer reconnects.
         """
-        while True:
-            self._ensure_connection()
-            ws = self._ws
-            if ws is None:
-                raise RuntimeError("WebSocket connection is not available.")
+        ws = self._ws
+        if ws is None or self._actions_from != self._connection_id:
+            raise self._replaced(
+                "The connection that answered this feedback's infer is gone; "
+                "dropping the feedback."
+            )
 
-            try:
-                packed_data = self._packer.pack(
-                    {
-                        "message_type": str(MessageType.FEEDBACK),
-                        "env_indices": env_indices,
-                        "step_ids": step_ids,
-                        "data": {
-                            "obs": obs,
-                            "rewards": rewards,
-                            "terminated": terminated,
-                            "truncated": truncated,
-                            "info": info,
-                        },
-                    }
-                )
-                ws.send(packed_data)
-                return
-            except ConnectionClosedOK as exc:
-                close_code, close_reason = _get_close_details(exc)
-                self._close_connection()
+        try:
+            packed_data = self._packer.pack(
+                {
+                    "message_type": str(MessageType.FEEDBACK),
+                    "env_indices": env_indices,
+                    "step_ids": step_ids,
+                    "data": {
+                        "obs": obs,
+                        "rewards": rewards,
+                        "terminated": terminated,
+                        "truncated": truncated,
+                        "info": info,
+                    },
+                }
+            )
+            ws.send(packed_data)
+        except ConnectionClosedOK as exc:
+            close_code, close_reason = _get_close_details(exc)
+            self._close_connection()
 
-                if close_reason == SERVER_STOP_REASON:
-                    if self._reconnect_on_server_stop:
-                        logger.info(
-                            "Server requested env client shutdown during FEEDBACK send, "
-                            "but reconnect_on_server_stop is enabled. "
-                            "Waiting for server to come back and retrying..."
-                        )
-                        continue
-                    raise ServerStopped(
-                        "Server requested env client shutdown after algorithm stop."
-                    ) from exc
-
-                if close_reason == SERVER_RESYNC_REASON:
-                    logger.info(
-                        "Server requested session resync during FEEDBACK send. "
-                        "Dropping stale feedback and resuming from the next infer request."
-                    )
-                    return
-
-                logger.warning(
-                    "Connection closed during FEEDBACK send. Dropping this "
-                    "transition and resuming from the next infer request. "
-                    f"code={close_code}, reason={close_reason or '<empty>'}"
-                )
-                return
-            except ConnectionClosedError as exc:
-                logger.warning(
-                    "Connection closed during FEEDBACK send. Dropping this "
-                    f"transition and resuming from the next infer request. {exc}"
-                )
-                self._close_connection()
-                return
-            except Exception:
-                self._close_connection()
-                raise
+            if (
+                close_reason == SERVER_STOP_REASON
+                and not self._reconnect_on_server_stop
+            ):
+                raise ServerStopped(
+                    "Server requested env client shutdown after algorithm stop."
+                ) from exc
+            # A resync, a stop the client waits out, or any other close: the
+            # feedback is dropped either way. Before, a stop with
+            # reconnect_on_server_stop retried, which resent it on the new
+            # connection - the one path that broke SPEC section 7.6.
+            logger.info(
+                "Connection closed during FEEDBACK send. Dropping the "
+                "transitions in flight and resuming from the next infer request. "
+                f"code={close_code}, reason={close_reason or '<empty>'}"
+            )
+            raise self._replaced("dropped feedback after a close") from exc
+        except ConnectionClosedError as exc:
+            logger.warning(
+                "Connection closed during FEEDBACK send. Dropping the "
+                f"transitions in flight and resuming from the next infer request. {exc}"
+            )
+            self._close_connection()
+            raise self._replaced("dropped feedback after a close") from exc
+        except Exception:
+            self._close_connection()
+            raise
 
     def reset(self) -> None:
         return
