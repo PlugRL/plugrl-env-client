@@ -17,7 +17,7 @@ dependencies = [
     "websockets>=15.0.1,<16.0.0",
     "msgpack>=1.1.1,<2.0.0",
     "tyro>=0.9.31,<0.10.0",
-    "plugrl-protocol @ git+https://github.com/PlugRL/plugrl-protocol.git@840296ecbe39dddc6fb9f3ac92479decac0797bd",
+    "plugrl-protocol @ git+https://github.com/PlugRL/plugrl-protocol.git@4c877bc9929fadbf49fbce8a5cd7d141bb3566a3",
     # The recorder's PNG snapshots. Its mp4 videos need ffmpeg: the `video`
     # extra.
     "imageio>=2.37.2,<3.0.0",

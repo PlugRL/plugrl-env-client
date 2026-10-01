@@ -30,6 +30,9 @@ class Args:
     server_host: str = "0.0.0.0"
     server_port: int = 8000
     reconnect_on_server_stop: bool = False
+    # Leave out of each infer the observations the server already holds from
+    # the last feedback, when it offers that (SPEC section 10.1).
+    reuse_feedback_obs: bool = True
 
 
 _CONFIGS_DICT = {
@@ -54,6 +57,7 @@ def make_agent_factory(args: Args):
         host=args.server_host,
         port=args.server_port,
         reconnect_on_server_stop=args.reconnect_on_server_stop,
+        reuse_feedback_obs=args.reuse_feedback_obs,
     )
 
 
