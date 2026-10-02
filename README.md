@@ -123,6 +123,7 @@ uv run plugrl-run-env-client <ENVIRONMENT_TYPE> [OPTIONS]
 | Type | Extra required | Description |
 | :--- | :--- | :--- |
 | **dummy-v1** | — | Dummy environment for protocol and connectivity tests |
+| **probe-v1** | — | The probe environment of SPEC.md section 8.1, for `plugrl-conformance --probe` |
 | **mujoco-v1** | `mujoco` | Gymnasium MuJoCo control, default `HalfCheetah-v5` |
 | **classic-v1** | `classic` | Classic control environments (e.g. CartPole) |
 | **atari-v1** | `atari` | Atari games via ALE |
