@@ -54,3 +54,24 @@ jobs:
 
       - name: Test
         run: uv run pytest -q
+
+      # plugrl-protocol's probe checker, with this client running the probe
+      # environment (SPEC.md section 8.1). It works out from each feedback
+      # what the client did with each action, and drives every scenario:
+      # basic, a resync, a text frame. Once as a version 1 server, once
+      # offering reuse-feedback-obs (10.1), which this client then uses.
+      # Each run takes seconds. One run on 2026-10-01 hung until the job's
+      # 6-hour limit and left no log (not reproduced on a Linux workstation),
+      # so a hang now fails within minutes and shows what was still running.
+      - name: Probe this client against SPEC.md
+        timeout-minutes: 10
+        run: |
+          client=".venv/bin/plugrl-run-env-client probe-v1 --server-host 127.0.0.1 --server-port 8000 --num-envs 3 --num-episodes 1000000"
+          for features in "" "--features reuse-feedback-obs"; do
+            echo "::group::plugrl-conformance --probe ${features:-(no features)}"
+            timeout 240 uv run plugrl-conformance --probe --scenario all --port 8000 \
+              --steps 12 --horizon 4 --action-dim 3 --action-dtype float64 \
+              --timeout 60 $features --client "$client" \
+              || { rc=$?; echo "plugrl-conformance exited $rc"; ps -ef | grep -i "[p]lugrl"; exit $rc; }
+            echo "::endgroup::"
+          done
