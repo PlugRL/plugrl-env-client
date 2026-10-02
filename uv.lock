@@ -2388,7 +2388,7 @@ requires-dist = [
     { name = "mujoco", marker = "extra == 'libero'", specifier = "==2.3.7" },
     { name = "mujoco", marker = "extra == 'robomimic'", specifier = "==2.3.7" },
     { name = "patchelf", marker = "extra == 'd4rl'", specifier = ">=0.17.2.4,<0.18.0" },
-    { name = "plugrl-protocol", git = "https://github.com/PlugRL/plugrl-protocol.git?rev=4c877bc9929fadbf49fbce8a5cd7d141bb3566a3" },
+    { name = "plugrl-protocol", git = "https://github.com/PlugRL/plugrl-protocol.git?rev=0a76192cc2456ee1136c5cbabe5206ca75e38f98" },
     { name = "pyopengl", marker = "extra == 'robomimic'", specifier = "==3.1.4" },
     { name = "robomimic", marker = "extra == 'robomimic'", git = "https://github.com/ARISE-Initiative/robomimic.git?rev=v0.4.0" },
     { name = "robosuite", marker = "extra == 'robomimic'", specifier = "==1.4.1" },
@@ -2407,7 +2407,7 @@ dev = [
 [[package]]
 name = "plugrl-protocol"
 version = "0.1.0"
-source = { git = "https://github.com/PlugRL/plugrl-protocol.git?rev=4c877bc9929fadbf49fbce8a5cd7d141bb3566a3#4c877bc9929fadbf49fbce8a5cd7d141bb3566a3" }
+source = { git = "https://github.com/PlugRL/plugrl-protocol.git?rev=0a76192cc2456ee1136c5cbabe5206ca75e38f98#0a76192cc2456ee1136c5cbabe5206ca75e38f98" }
 dependencies = [
     { name = "msgpack" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-17-plugrl-env-client-libero' and extra == 'extra-17-plugrl-env-client-mujoco') or (extra == 'extra-17-plugrl-env-client-mujoco' and extra == 'extra-17-plugrl-env-client-robomimic')" },
