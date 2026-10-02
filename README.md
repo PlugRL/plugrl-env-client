@@ -21,6 +21,13 @@
     `video`. E45 measured them at 45 MB and 77 MB of the 222 MB install
     (`plugrl-server/experiments/e45-env-side-footprint/`).
   * **Distributed communication**: `websockets` plus `msgpack` for asynchronous transfer between the server and any number of env clients, across machines.
+  * **Each observation sent once**: a feedback carries the observation the
+    next chunk starts from, and the next infer used to send it again. When the
+    server offers `reuse-feedback-obs` (plugrl-protocol `SPEC.md` section
+    10.1), the infer leaves out every observation the server already has, so
+    only the observation after a reset crosses the link twice. Nothing changes
+    with a server that does not offer it, and `--no-reuse-feedback-obs` turns
+    it off.
   * **Modular design**: Separates the environment-side runtime (`plugrl-env-client`) from the shared protocol layer (`plugrl-protocol`).
   * **Command-line interface**: A `tyro`-powered CLI for starting and managing env clients.
   * **Gymnasium integration**: Works with standard `Gymnasium` environments.
